@@ -1,0 +1,2457 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECO-LAB: Game Rantai & Jaring-Jaring Makanan - IPA SMP Kelas 7</title>
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Fredoka & Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- MediaPipe Hands & Camera Utils CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            user-select: none;
+            overflow-x: hidden;
+        }
+        .font-fredoka {
+            font-family: 'Fredoka', cursive;
+        }
+        
+        /* Canvas Video Overlay & Mirroring */
+        .mirror {
+            transform: scaleX(-1);
+        }
+
+        /* Animated Glowing Lines for Energy Flow (Level 4) */
+        @keyframes flowEnergy {
+            from { stroke-dashoffset: 40; }
+            to { stroke-dashoffset: 0; }
+        }
+        .energy-line-valid {
+            stroke: #10B981;
+            stroke-width: 5;
+            stroke-dasharray: 8 4;
+            animation: flowEnergy 0.8s linear infinite;
+            filter: drop-shadow(0px 0px 8px #10B981);
+        }
+        .energy-line-bonus {
+            stroke: #F59E0B;
+            stroke-width: 5;
+            stroke-dasharray: 8 4;
+            animation: flowEnergy 0.6s linear infinite;
+            filter: drop-shadow(0px 0px 10px #F59E0B);
+        }
+        .energy-line-temp {
+            stroke: #3B82F6;
+            stroke-width: 4;
+            stroke-dasharray: 6 3;
+            animation: flowEnergy 0.5s linear infinite;
+        }
+        .energy-line-error {
+            stroke: #EF4444;
+            stroke-width: 5;
+            stroke-dasharray: 4 2;
+            animation: flowEnergy 0.3s linear infinite;
+            filter: drop-shadow(0px 0px 8px #EF4444);
+        }
+
+        /* Node Hover & Drag Effects */
+        .organism-node {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            touch-action: none;
+        }
+        .organism-node:hover {
+            transform: scale(1.08);
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+        }
+        .organism-node.active-pinch {
+            transform: scale(1.15);
+            border-color: #F59E0B;
+            box-shadow: 0 0 20px #F59E0B;
+        }
+        .organism-node.extinct {
+            filter: grayscale(100%) opacity(40%);
+            pointer-events: none;
+            border-color: #6B7280;
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        /* Animasi Efek Hover pada Slot saat Kartu Dilewati di Mode WebCam */
+        .slot-hover-active {
+            border-color: #F59E0B !important;
+            background-color: rgba(245, 158, 11, 0.25) !important;
+            animation: slotPulse 0.5s infinite alternate ease-in-out !important;
+        }
+
+        @keyframes slotPulse {
+            from {
+                transform: scale(1.05);
+                box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+            }
+            to {
+                transform: scale(1.15);
+                box-shadow: 0 0 28px rgba(245, 158, 11, 0.9);
+            }
+        }
+
+        .glass-light {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        /* Hapus Shading Gelap pada Mode WebCam agar Tayangan Video Jernih */
+        body.webcam-active .glass-panel {
+            background: rgba(15, 23, 42, 0.2) !important;
+            backdrop-filter: blur(3px) !important;
+        }
+        body.webcam-active #solo-board-container,
+        body.webcam-active #p1-panel,
+        body.webcam-active #p2-panel {
+            background: rgba(15, 23, 42, 0.15) !important;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #10B981;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col justify-between select-none">
+
+    <!-- AUDIO FEEDBACK SYNTHESIZER (Web Audio API) -->
+    <script>
+        // Inisialisasi Audio Context
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioCtx();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Efek Suara (SFX) Tanpa File Eksternal
+        function playSound(type) {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'pop') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'success') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'error') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(160, now + 0.15);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'win') {
+                    // Melody Kemenangan
+                    const notes = [440, 554.37, 659.25, 880];
+                    notes.forEach((freq, idx) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.frequency.value = freq;
+                        g.gain.setValueAtTime(0.2, now + idx * 0.12);
+                        g.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.12 + 0.25);
+                        o.start(now + idx * 0.12);
+                        o.stop(now + idx * 0.12 + 0.25);
+                    });
+                } else if (type === 'extinct') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(40, now + 0.5);
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
+            } catch (e) {
+                console.log("Audio Error:", e);
+            }
+        }
+    </script>
+
+    <!-- CONTAINER WEBCAM BACKGROUND -->
+    <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <!-- Background Wallpaper Ekosistem -->
+        <div id="bg-wallpaper" class="absolute inset-0 bg-gradient-to-br from-emerald-950 via-slate-900 to-cyan-950 opacity-90 transition-opacity duration-500"></div>
+        <div id="bg-pattern" class="absolute inset-0 opacity-10 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:24px_24px] transition-opacity duration-500"></div>
+        
+        <!-- Video Feed Webcam -->
+        <video id="webcam-video" class="absolute inset-0 w-full h-full object-cover mirror opacity-100 hidden" autoplay playsinline muted></video>
+
+        <!-- Overlay Canvas untuk Tracking Tangan & Garis Koneksi -->
+        <canvas id="tracking-canvas" class="absolute inset-0 w-full h-full z-10 mirror pointer-events-none"></canvas>
+    </div>
+
+    <!-- ELEMEN KARTU MELAYANG WEBCAM (GESTURE DRAG PROXY) -->
+    <div id="webcam-floating-card" class="fixed hidden pointer-events-none z-50 -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out"></div>
+
+    <!-- ==================== SPLASH SCREEN (Halaman Pembuka) ==================== -->
+    <div id="splash-screen" class="relative z-20 flex flex-col justify-between min-h-screen p-4 sm:p-8 max-w-5xl mx-auto w-full">
+        <!-- Header Logo Instansi & Organisasi -->
+        <header class="flex flex-wrap items-center justify-between gap-4 glass-panel p-4 rounded-2xl border-emerald-500/30">
+            <div class="flex items-center gap-3">
+                <img src="https://lh3.googleusercontent.com/d/18U8bEw_DS0oUYIduh4gtdXq8TAR75irp" 
+                     alt="Logo Pemkab Wonogiri" 
+                     class="h-12 w-auto object-contain drop-shadow"
+                     onerror="this.onerror=null; this.src='https://placehold.co/100x100/10b981/ffffff?text=WONOGIRI';">
+                <div class="border-l border-slate-600 pl-3">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Pemerintah Kabupaten Wonogiri</h2>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="text-right border-r border-slate-600 pr-3">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-emerald-400">PGRI Kabupaten Wonogiri</h2>
+                </div>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Persatuan_Guru_Republik_Indonesia.png" 
+                     alt="Logo PGRI" 
+                     class="h-12 w-auto object-contain drop-shadow"
+                     onerror="this.onerror=null; this.src='https://placehold.co/100x100/dc2626/ffffff?text=PGRI';">
+            </div>
+        </header>
+
+        <!-- Main Banner Content -->
+        <main class="my-auto py-8 text-center flex flex-col items-center">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-sm font-semibold mb-4 animate-pulse">
+                <i class="fa-solid fa-leaf"></i> Media Pembelajaran IPA Interaktif
+            </div>
+            
+            <h1 class="font-fredoka text-4xl sm:text-6xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-200 to-cyan-400 drop-shadow-lg tracking-wide mb-3">
+                ECO-LAB
+            </h1>
+            <p class="text-lg sm:text-2xl font-medium text-slate-200 max-w-2xl mb-6">
+                Eksplorasi Rantai & Jaring-Jaring Makanan dengan Gesture Webcam Interaktif
+            </p>
+
+            <!-- Card Identitas Pembuat -->
+            <div class="glass-panel p-4 rounded-xl border-emerald-500/30 max-w-md w-full mb-8 text-left shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl"></div>
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-2xl shadow-lg">
+                        <i class="fa-solid fa-user-graduate"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest block">Pengembang Media</span>
+                        <h3 class="font-fredoka text-lg text-white font-bold">IKHSAN ABDUL LATIF</h3>
+                        <p class="text-xs text-slate-300">SMP Negeri 1 Nguntoronadi - Cabang PGRI Kecamatan Nguntoronadi</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons: Halaman Utama (Mulai Main & Petunjuk) -->
+            <div class="flex flex-col sm:flex-row items-center gap-4 w-full justify-center max-w-lg">
+                <button onclick="openSetupModal()" class="w-full sm:w-1/2 px-6 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-900 font-fredoka font-bold text-lg shadow-lg shadow-emerald-500/30 hover:scale-105 transition active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-play text-2xl"></i> Mulai Main
+                </button>
+                <button onclick="toggleGuideModal(true)" class="w-full sm:w-1/2 px-6 py-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-fredoka font-bold text-lg border border-slate-600 hover:border-emerald-400 shadow-lg transition hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-book-open text-emerald-400 text-xl"></i> Petunjuk & Materi
+                </button>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center text-xs text-slate-400 py-2">
+            © 2026 ECO-LAB Wonogiri • Didukung oleh MediaPipe AI & Web Audio API
+        </footer>
+    </div>
+
+
+    <!-- ==================== MAIN GAMEPLAY SCREEN ==================== -->
+    <div id="game-screen" class="hidden relative z-20 flex flex-col justify-between min-h-screen p-2 sm:p-4 max-w-7xl mx-auto w-full">
+        
+        <!-- TOP HUD (Header Status & Skor) -->
+        <header class="glass-panel rounded-2xl p-3 sm:p-4 mb-3 flex flex-wrap items-center justify-between gap-3 shadow-xl border-emerald-500/30">
+            <!-- Left Info: Level & Timer -->
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-r from-emerald-600 to-teal-700 px-4 py-1.5 rounded-xl font-fredoka font-bold text-sm sm:text-base shadow">
+                    <span id="hud-level-title">LEVEL 1: RANTAI MAKANAN SAWAH</span>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700">
+                    <i class="fa-solid fa-stopwatch text-amber-400 text-lg"></i>
+                    <span id="hud-timer" class="font-mono font-bold text-amber-300 text-lg">120s</span>
+                </div>
+            </div>
+
+            <!-- Middle Info: Master Ekosistem Progress -->
+            <div class="hidden md:flex flex-col items-center w-48">
+                <div class="flex justify-between w-full text-xs font-semibold mb-1">
+                    <span class="text-slate-300">Master Ekosistem</span>
+                    <span id="hud-progress-text" class="text-emerald-400 font-bold">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-3 border border-slate-700 overflow-hidden">
+                    <div id="hud-progress-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full w-0 transition-all duration-500"></div>
+                </div>
+            </div>
+
+            <!-- Right Info: Score & Webcam Control -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Solo Score Display -->
+                <div id="solo-score-box" class="flex items-center gap-2 bg-slate-800/90 px-4 py-1.5 rounded-xl border border-slate-700">
+                    <i class="fa-solid fa-star text-yellow-400 text-xl"></i>
+                    <div class="text-left">
+                        <span class="text-[10px] text-slate-400 uppercase block leading-none">Skor Total</span>
+                        <span id="hud-score" class="font-fredoka font-bold text-yellow-400 text-xl leading-none">0</span>
+                    </div>
+                </div>
+
+                <!-- Battle Scores Display (VS HUD) -->
+                <div id="battle-score-box" class="hidden flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-xl border border-amber-500/50">
+                    <div id="p1-hud-card" class="px-3 py-1 rounded-lg bg-emerald-900/90 border-2 border-emerald-400 flex items-center gap-2">
+                        <i class="fa-solid fa-user text-emerald-400"></i>
+                        <div class="text-left">
+                            <span class="text-[9px] text-emerald-300 font-bold block leading-none">P1</span>
+                            <span id="hud-p1-score" class="font-fredoka font-bold text-emerald-300 text-base leading-none">0</span>
+                        </div>
+                    </div>
+                    <span class="font-fredoka font-bold text-xs text-amber-400">VS</span>
+                    <div id="p2-hud-card" class="px-3 py-1 rounded-lg bg-cyan-900/90 border-2 border-cyan-400 flex items-center gap-2">
+                        <i class="fa-solid fa-user-ninja text-cyan-400"></i>
+                        <div class="text-left">
+                            <span class="text-[9px] text-cyan-300 font-bold block leading-none">P2</span>
+                            <span id="hud-p2-score" class="font-fredoka font-bold text-cyan-300 text-base leading-none">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toggle Kamera -->
+                <button id="btn-toggle-cam" onclick="toggleWebcam()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold flex items-center gap-2 transition" title="Aktifkan/Matikan Webcam">
+                    <i id="cam-icon" class="fa-solid fa-video-slash text-red-400"></i>
+                    <span id="cam-status-text" class="hidden sm:inline">Webcam Off</span>
+                </button>
+
+                <!-- Tombol Buku Panduan -->
+                <button onclick="toggleGuideModal(true)" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-emerald-400 transition" title="Buku Panduan">
+                    <i class="fa-solid fa-book text-lg"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- SOLO MODE BOARD CONTAINER -->
+        <main id="solo-board-container" class="relative flex-1 flex flex-col justify-between items-center rounded-2xl glass-panel p-4 border-slate-700/60 overflow-hidden min-h-[480px]">
+            <!-- Instructions Banner -->
+            <div id="instructions-bar" class="w-full bg-slate-800/90 border border-emerald-500/40 rounded-xl p-3 mb-4 text-center text-sm text-slate-200 shadow flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 text-left">
+                    <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg"><i class="fa-solid fa-hand-pointer"></i></span>
+                    <span id="instruction-text" class="font-medium text-xs sm:text-sm">Seret kartu makhluk hidup di bawah ke slot urutan yang tepat!</span>
+                </div>
+                <div class="hidden sm:flex items-center gap-2 text-xs bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-700 text-amber-300">
+                    <i class="fa-solid fa-hand-back-fist"></i> PINCH = Ambil | <i class="fa-solid fa-hand"></i> LEPAS = Letakkan
+                </div>
+            </div>
+
+            <!-- LEVEL 1, 2, 3 LAYOUT (SLOT SEQUENCES - SOLO) -->
+            <div id="sequence-game-area" class="w-full my-auto flex flex-col items-center justify-center gap-6">
+                <!-- Drop Target Slots Container -->
+                <div id="slots-container" class="flex flex-wrap items-center justify-center gap-3 sm:gap-4 w-full">
+                    <!-- Slot elements injected dynamically -->
+                </div>
+
+                <!-- Indicator Arrow flow -->
+                <div class="text-xs text-slate-400 flex items-center gap-2 bg-slate-900/60 px-4 py-1 rounded-full border border-slate-800">
+                    <span>Produsen</span> <i class="fa-solid fa-arrow-right text-emerald-400"></i> <span>Konsumen / Pengurai</span>
+                </div>
+            </div>
+
+            <!-- LEVEL 4 LAYOUT (JARING-JARING MAKANAN GRAPH NETWORK - SOLO) -->
+            <div id="network-game-area" class="hidden relative w-full h-full min-h-[420px] flex-1">
+                <!-- SVG Energy Lines Container -->
+                <svg id="svg-network" class="absolute inset-0 w-full h-full pointer-events-none z-10">
+                    <defs>
+                        <marker id="arrow-green" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#10B981" />
+                        </marker>
+                        <marker id="arrow-bonus" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B" />
+                        </marker>
+                        <marker id="arrow-error" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#EF4444" />
+                        </marker>
+                    </defs>
+                    <g id="svg-connections-group"></g>
+                    <line id="svg-active-drag-line" x1="0" y1="0" x2="0" y2="0" class="energy-line-temp hidden" />
+                </svg>
+
+                <!-- Floating Organism Nodes Container -->
+                <div id="nodes-container" class="absolute inset-0 w-full h-full z-20"></div>
+
+                <!-- Mini Map Piramida -->
+                <div class="absolute bottom-2 right-2 bg-slate-900/90 border border-slate-700 p-2.5 rounded-xl shadow-xl z-30 w-44 text-[10px]">
+                    <div class="font-bold text-emerald-400 mb-1 flex items-center justify-between">
+                        <span>PIRAMIDA ENERGI</span>
+                        <i class="fa-solid fa-mountain text-amber-400"></i>
+                    </div>
+                    <div class="space-y-1 text-center font-semibold">
+                        <div class="bg-red-950/80 border border-red-500/40 text-red-200 py-0.5 rounded">Apex: Elang (🦅)</div>
+                        <div class="bg-amber-950/80 border border-amber-500/40 text-amber-200 py-0.5 rounded mx-2">Karnivora: Ular, Katak</div>
+                        <div class="bg-yellow-950/80 border border-yellow-500/40 text-yellow-200 py-0.5 rounded mx-4">Herbivora: Belalang, Tikus, Pipit</div>
+                        <div class="bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 py-0.5 rounded">Produsen: Padi, Rumput</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LEVEL 4 ACTION CONTROLS BAR (SOLO) -->
+            <div id="level4-controls" class="hidden w-full flex flex-wrap items-center justify-between gap-2 mt-3 z-30 pt-2 border-t border-slate-800">
+                <div class="flex items-center gap-2">
+                    <button onclick="checkJaringNetwork()" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-900 font-fredoka font-bold rounded-xl text-sm shadow flex items-center gap-2 transition active:scale-95">
+                        <i class="fa-solid fa-circle-check"></i> CEK JARING
+                    </button>
+                    <button onclick="openExtinctionModal()" class="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white font-fredoka font-bold rounded-xl text-sm shadow flex items-center gap-2 transition active:scale-95">
+                        <i class="fa-solid fa-skull-crossbones"></i> SIMULASI KEPUNAHAN
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <span id="level4-counter" class="text-xs font-semibold text-emerald-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                        Koneksi: <span id="connected-count" class="text-white font-bold">0</span>/10 Utama
+                    </span>
+                    <button onclick="clearNetworkLines()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition" title="Hapus Semua Garis">
+                        <i class="fa-solid fa-rotate-left"></i> Reset Garis
+                    </button>
+                </div>
+            </div>
+
+            <!-- CARDS DECK BAR (SOLO LEVEL 1 - 3) -->
+            <div id="cards-deck-container" class="w-full pt-3 z-20 border-t border-slate-800">
+                <div id="cards-deck" class="flex flex-wrap items-center justify-center gap-3"></div>
+            </div>
+        </main>
+
+        <!-- SPLIT SCREEN BATTLE BOARD CONTAINER (2 PLAYERS SIDE-BY-SIDE: KIRI & KANAN) -->
+        <main id="battle-board-container" class="hidden w-full flex-1 grid grid-cols-2 gap-2 sm:gap-4 my-auto">
+            
+            <!-- PEMAIN 1 PANEL (LEFT - GREEN ACCENT) -->
+            <div id="p1-panel" class="glass-panel rounded-2xl p-2 sm:p-3 border-2 border-emerald-500/60 flex flex-col justify-between relative overflow-hidden min-h-[380px] sm:min-h-[420px]">
+                <div class="flex items-center justify-between pb-2 border-b border-emerald-500/30 mb-2">
+                    <span class="font-fredoka font-bold text-emerald-400 text-xs sm:text-base flex items-center gap-1 sm:gap-2">
+                        <i class="fa-solid fa-user"></i> PEMAIN 1 (KIRI)
+                    </span>
+                    <span id="p1-side-score-badge" class="font-fredoka font-bold text-yellow-300 text-[10px] sm:text-xs bg-emerald-950/80 px-2 sm:px-3 py-1 rounded-lg border border-emerald-500/40">Skor: 0</span>
+                </div>
+
+                <!-- P1 Arena Content -->
+                <div id="p1-arena" class="relative flex-1 flex flex-col justify-between items-center w-full">
+                    <!-- Sequence L1-3 P1 -->
+                    <div id="p1-seq-area" class="w-full my-auto flex flex-col items-center justify-center gap-3">
+                        <div id="p1-slots" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 w-full"></div>
+                        <div id="p1-deck" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pt-2 border-t border-slate-800 w-full"></div>
+                    </div>
+                    <!-- Network L4 P1 -->
+                    <div id="p1-net-area" class="hidden relative w-full h-full min-h-[320px] sm:min-h-[340px] flex-1">
+                        <svg id="svg-p1" class="absolute inset-0 w-full h-full pointer-events-none z-10">
+                            <g id="svg-p1-connections"></g>
+                            <line id="svg-p1-active-line" x1="0" y1="0" x2="0" y2="0" class="energy-line-temp hidden" />
+                        </svg>
+                        <div id="nodes-p1" class="absolute inset-0 w-full h-full z-20"></div>
+                    </div>
+                </div>
+
+                <!-- P1 Controls L4 -->
+                <div id="p1-l4-ctrl" class="hidden flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+                    <button onclick="checkJaringNetworkForPlayer(1)" class="px-2.5 py-1.5 bg-emerald-500 text-slate-950 font-fredoka font-bold rounded-lg hover:bg-emerald-400 transition text-[11px] sm:text-xs">Cek Jaring P1</button>
+                    <span class="text-emerald-300 font-bold text-[10px] sm:text-xs">Koneksi: <span id="p1-conn-count">0</span>/10</span>
+                </div>
+            </div>
+
+            <!-- PEMAIN 2 PANEL (RIGHT - CYAN ACCENT) -->
+            <div id="p2-panel" class="glass-panel rounded-2xl p-2 sm:p-3 border-2 border-cyan-500/60 flex flex-col justify-between relative overflow-hidden min-h-[380px] sm:min-h-[420px]">
+                <div class="flex items-center justify-between pb-2 border-b border-cyan-500/30 mb-2">
+                    <span class="font-fredoka font-bold text-cyan-400 text-xs sm:text-base flex items-center gap-1 sm:gap-2">
+                        <i class="fa-solid fa-user-ninja"></i> PEMAIN 2 (KANAN)
+                    </span>
+                    <span id="p2-side-score-badge" class="font-fredoka font-bold text-yellow-300 text-[10px] sm:text-xs bg-cyan-950/80 px-2 sm:px-3 py-1 rounded-lg border border-cyan-500/40">Skor: 0</span>
+                </div>
+
+                <!-- P2 Arena Content -->
+                <div id="p2-arena" class="relative flex-1 flex flex-col justify-between items-center w-full">
+                    <!-- Sequence L1-3 P2 -->
+                    <div id="p2-seq-area" class="w-full my-auto flex flex-col items-center justify-center gap-3">
+                        <div id="p2-slots" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 w-full"></div>
+                        <div id="p2-deck" class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pt-2 border-t border-slate-800 w-full"></div>
+                    </div>
+                    <!-- Network L4 P2 -->
+                    <div id="p2-net-area" class="hidden relative w-full h-full min-h-[320px] sm:min-h-[340px] flex-1">
+                        <svg id="svg-p2" class="absolute inset-0 w-full h-full pointer-events-none z-10">
+                            <g id="svg-p2-connections"></g>
+                            <line id="svg-p2-active-line" x1="0" y1="0" x2="0" y2="0" class="energy-line-temp hidden" />
+                        </svg>
+                        <div id="nodes-p2" class="absolute inset-0 w-full h-full z-20"></div>
+                    </div>
+                </div>
+
+                <!-- P2 Controls L4 -->
+                <div id="p2-l4-ctrl" class="hidden flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+                    <button onclick="checkJaringNetworkForPlayer(2)" class="px-2.5 py-1.5 bg-cyan-500 text-slate-950 font-fredoka font-bold rounded-lg hover:bg-cyan-400 transition text-[11px] sm:text-xs">Cek Jaring P2</button>
+                    <span class="text-cyan-300 font-bold text-[10px] sm:text-xs">Koneksi: <span id="p2-conn-count">0</span>/10</span>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+
+    <!-- ==================== MODAL BUKU PANDUAN & PETUNJUK ==================== -->
+    <div id="guide-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel max-w-2xl w-full rounded-2xl p-6 border-emerald-500/40 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+                    <h3 class="font-fredoka text-2xl text-emerald-400 font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-book-bookmark"></i> BUKU PANDUAN ECO-LAB
+                    </h3>
+                    <button onclick="toggleGuideModal(false)" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-4 text-sm text-slate-300">
+                    <!-- Tujuan & Target Pembelajaran -->
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+                        <h4 class="font-bold text-teal-300 text-base mb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-bullseye"></i> Tujuan & Target Pembelajaran
+                        </h4>
+                        <ul class="space-y-1.5 text-xs sm:text-sm">
+                            <li><strong class="text-emerald-400">Tujuan Pembelajaran:</strong> Mengidentifikasi Komponen Ekosistem</li>
+                            <li><strong class="text-emerald-400">Target Capaian:</strong> Murid mampu mengidentifikasi peran masing-masing komponen ekosistem.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Kontrol Gestur & Mouse -->
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+                        <h4 class="font-bold text-amber-300 text-base mb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-hand"></i> Cara Bermain & Mode
+                        </h4>
+                        <ul class="space-y-1.5 text-xs sm:text-sm">
+                            <li><strong class="text-emerald-400">Mode Solo:</strong> Selesaikan tantangan secara mandiri untuk mengumpulkan skor tertinggi.</li>
+                            <li><strong class="text-amber-400">Mode Battle (2 Players):</strong> Tanding 2 pemain secara berdampingan (Kiri vs Kanan). ⚡ <em>Pemain yang selesai lebih dahulu mendapat tambahan poin kecepatan & langsung melanjutkan ke level berikutnya!</em></li>
+                            <li><strong class="text-emerald-400">Mode Webcam:</strong> Dekatkan jempol & telunjuk (<span class="text-amber-300 font-semibold">PINCH</span>) untuk mengambil kartu / menarik garis energi. Buka telapak tangan untuk melepas.</li>
+                            <li><strong class="text-emerald-400">Mode Mouse / Sentuh:</strong> Klik & seret (drag & drop) kartu atau tarik garis dari satu node ke node lain secara langsung.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Peran Komponen Ekosistem -->
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+                        <h4 class="font-bold text-emerald-400 text-base mb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-sitemap"></i> Komponen Ekosistem IPA Kelas 7
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div class="p-2 bg-emerald-950/40 rounded border border-emerald-800">
+                                <strong class="text-emerald-300">🌾 Produsen:</strong> Organisme autotrof penyedia energi utama (Padi, Rumput, Fitoplankton).
+                            </div>
+                            <div class="p-2 bg-amber-950/40 rounded border border-amber-800">
+                                <strong class="text-amber-300">🦗 Konsumen I (Herbivora):</strong> Pemakan produsen langsung (Belalang, Tikus, Zooplankton).
+                            </div>
+                            <div class="p-2 bg-cyan-950/40 rounded border border-cyan-800">
+                                <strong class="text-cyan-300">🐸 Konsumen II/III:</strong> Karnivora/Omnivora sekunder (Katak, Ular, Burung Pipit).
+                            </div>
+                            <div class="p-2 bg-red-950/40 rounded border border-red-800">
+                                <strong class="text-red-300">🦅 Apex Predator:</strong> Pemuncak rantai makanan tanpa pemangsa alami (Elang, Hiu).
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Perbedaan Rantai vs Jaring -->
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 text-xs">
+                        <h4 class="font-bold text-cyan-300 text-sm mb-1">💡 Rantai Makanan vs Jaring-Jaring Makanan</h4>
+                        <p><strong>Rantai Makanan:</strong> Jalur tunggal perpindahan energi dari produsen ke konsumen.<br>
+                        <strong>Jaring-Jaring Makanan:</strong> Kumpulan dari beberapa rantai makanan yang saling berhubungan. Semakin kompleks jaring-jaring makanan, semakin stabil ekosistem tersebut!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-3 border-t border-slate-800 flex justify-end">
+                <button onclick="toggleGuideModal(false)" class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-fredoka font-bold rounded-xl text-sm transition">
+                    Paham, Lanjutkan!
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==================== MODAL PENGATURAN PERMAINAN (MODE & CARA MAIN) ==================== -->
+    <div id="setup-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel max-w-md w-full rounded-2xl p-6 border-emerald-500/40 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
+                <h3 class="font-fredoka text-xl text-emerald-400 font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-sliders"></i> Pengaturan Permainan
+                </h3>
+                <button onclick="toggleSetupModal(false)" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Opsi 1: Pilih Mode Permainan -->
+            <div class="mb-5">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                    1. Pilih Mode Permainan
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" id="opt-mode-solo" onclick="selectSetupOption('mode', 'solo')" class="p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition">
+                        <i class="fa-solid fa-user text-emerald-400 text-xl"></i>
+                        <span>Mode Solo</span>
+                    </button>
+                    <button type="button" id="opt-mode-battle" onclick="selectSetupOption('mode', 'battle')" class="p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-amber-500 transition">
+                        <span class="text-xl">⚔️</span>
+                        <span>Mode Battle</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Opsi 2: Pilih Cara Main -->
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                    2. Pilih Cara Main
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" id="opt-control-webcam" onclick="selectSetupOption('control', 'webcam')" class="p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-emerald-500 transition">
+                        <i class="fa-solid fa-camera text-teal-400 text-xl"></i>
+                        <span>Mode WebCam</span>
+                    </button>
+                    <button type="button" id="opt-control-touch" onclick="selectSetupOption('control', 'touch')" class="p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition">
+                        <i class="fa-solid fa-hand-pointer text-amber-400 text-xl"></i>
+                        <span>Mode Sentuh</span>
+                    </button>
+                </div>
+            </div>
+
+            <button onclick="confirmAndStartGame()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-fredoka font-bold text-base shadow-lg shadow-emerald-500/30 transition active:scale-95 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play text-lg"></i> Mulai Permainan
+            </button>
+        </div>
+    </div>
+
+
+    <!-- ==================== MODAL AKTIVASI SENSOR TANGAN (WEBCAM CALIBRATION) ==================== -->
+    <div id="webcam-activation-screen" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent pointer-events-auto">
+        <div class="glass-panel max-w-lg w-full rounded-3xl p-6 border-emerald-500/50 shadow-2xl text-center relative overflow-hidden !bg-slate-900/20 !backdrop-blur-sm">
+            <!-- Glowing Accent -->
+            <div class="absolute -top-16 -left-16 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl"></div>
+            <div class="absolute -bottom-16 -right-16 w-32 h-32 bg-teal-500/20 rounded-full blur-2xl"></div>
+
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-emerald-200 text-xs font-semibold mb-3">
+                <i class="fa-solid fa-hand-sparkles"></i> Kalibrasi & Tes Sensor
+            </div>
+
+            <h3 class="font-fredoka text-2xl sm:text-3xl text-emerald-400 font-bold mb-1 drop-shadow-md">Aktivasi Sensor Tangan</h3>
+            <p class="text-xs text-slate-100 mb-5 font-medium drop-shadow">Uji coba gestur tangan sebelum memasuki arena permainan!</p>
+
+            <!-- Status Indicator Badge -->
+            <div id="activation-status-badge" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/60 border border-amber-500/50 text-amber-300 text-xs font-bold mb-5 transition-all duration-300 backdrop-blur-md">
+                <span id="activation-ping-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                <span id="activation-status-text">Mencari Tangan di Depan Kamera...</span>
+            </div>
+
+            <!-- Target Pinch Interactive Zone -->
+            <div id="activation-target-zone" class="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto rounded-3xl border-4 border-dashed border-emerald-400/80 bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-4 transition-all duration-300 shadow-lg my-2">
+                <div id="activation-target-icon" class="text-4xl sm:text-5xl mb-2 text-emerald-400 transition-transform duration-300 drop-shadow">
+                    <i class="fa-solid fa-hand-back-fist"></i>
+                </div>
+                <span id="activation-target-label" class="font-fredoka text-xs sm:text-sm font-bold text-white text-center leading-snug drop-shadow">
+                    Tempelkan Jempol & Telunjuk (PINCH)
+                </span>
+                <span class="text-[10px] text-slate-300 mt-1 font-semibold">Genggam target ini</span>
+            </div>
+
+            <!-- Progress Meter -->
+            <div class="w-full bg-slate-900/60 backdrop-blur-md rounded-full h-3 border border-slate-600/80 overflow-hidden mt-5 mb-2">
+                <div id="activation-progress-bar" class="bg-gradient-to-r from-emerald-500 to-teal-300 h-full w-0 transition-all duration-150"></div>
+            </div>
+            <span id="activation-progress-text" class="text-[11px] font-bold text-emerald-300 block mb-5 drop-shadow">Progres Aktivasi: 0%</span>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-3 justify-center">
+                <button onclick="finishWebcamActivation()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-fredoka font-bold text-sm shadow-lg transition active:scale-95 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-check"></i> Siap, Masuk Permainan!
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==================== MODAL SIMULASI KEPUNAHAN (LEVEL 4) ==================== -->
+    <div id="extinction-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+        <div class="glass-panel max-w-md w-full rounded-2xl p-6 border-red-500/50 shadow-2xl text-center">
+            <div class="w-16 h-16 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center text-3xl mx-auto mb-3 border border-red-500/40 animate-pulse">
+                <i class="fa-solid fa-skull"></i>
+            </div>
+            <h3 class="font-fredoka text-2xl text-red-400 font-bold mb-2">SIMULASI KEPUNAHAN BELALANG</h3>
+            <p class="text-xs text-slate-300 mb-4">
+                Uji dampak keseimbangan ekosistem jika populasi Belalang musnah secara mendadak akibat pestisida berlebih!
+            </p>
+
+            <div class="bg-slate-900/90 p-4 rounded-xl border border-slate-700 text-left mb-5">
+                <span class="text-xs font-bold text-amber-400 block mb-1">Pertanyaan Analisis Ekosistem:</span>
+                <p class="text-sm font-medium text-white mb-3">
+                    Makhluk apa yang paling terdampak langsung kehilangan sumber energinya jika Belalang punah?
+                </p>
+                <div class="space-y-2">
+                    <button onclick="answerExtinctionQuiz(true)" class="w-full text-left p-3 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-circle-dot text-emerald-400"></i> Katak dan Burung Pipit (Kehilangan makanan utama)
+                    </button>
+                    <button onclick="answerExtinctionQuiz(false)" class="w-full text-left p-3 rounded-xl bg-slate-800 hover:bg-red-600/30 border border-slate-700 hover:border-red-500 text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-circle-dot text-slate-500"></i> Padi saja (Tumbuh terlalu subur)
+                    </button>
+                </div>
+            </div>
+
+            <button onclick="closeExtinctionModal()" class="text-xs text-slate-400 hover:text-white underline">Batal Simulasi</button>
+        </div>
+    </div>
+
+
+    <!-- ==================== MODAL KUIS AKHIR & CERTIFICATE / VICTORY ==================== -->
+    <div id="victory-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg">
+        <div class="glass-panel max-w-2xl w-full rounded-3xl p-5 sm:p-7 border-emerald-500/50 shadow-2xl text-center relative overflow-hidden max-h-[95vh] overflow-y-auto">
+            <!-- Glowing Background Accent -->
+            <div class="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl"></div>
+            <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl"></div>
+
+            <!-- POST-QUIZ QUESTION SECTION -->
+            <div id="post-quiz-section">
+                <div id="quiz-turn-badge" class="inline-block px-4 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-bold mb-3">
+                    <i class="fa-solid fa-brain"></i> TANTANGAN AKHIR BIOLOGI
+                </div>
+                <h3 class="font-fredoka text-2xl sm:text-3xl text-emerald-400 font-bold mb-2">Evaluasi Pemahaman Ekosistem</h3>
+                <p id="quiz-subtitle" class="text-xs sm:text-sm text-slate-200 mb-5">
+                    Jawab 5 pertanyaan reflektif berikut untuk mengklaim gelar Lencana Master Anda!
+                </p>
+
+                <!-- SOLO QUIZ CONTAINER -->
+                <div id="solo-quiz-container" class="bg-slate-900/90 p-5 rounded-2xl border border-slate-700 text-left mb-6 shadow-inner">
+                    <p id="quiz-question-text" class="text-sm sm:text-base font-semibold text-white mb-4">
+                        Loading...
+                    </p>
+                    <div id="quiz-options-container" class="space-y-3"></div>
+                </div>
+
+                <!-- BATTLE QUIZ CONTAINER (2 KOLOM: KANAN & KIRI) -->
+                <div id="battle-quiz-container" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
+                    <!-- Pemain 1 Kuis Box (Kiri) -->
+                    <div class="bg-slate-900/90 p-4 rounded-2xl border-2 border-emerald-500/60 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5"><i class="fa-solid fa-user"></i> PEMAIN 1 (KIRI)</span>
+                                <span id="p1-quiz-prog" class="text-[10px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-500/40">Soal 1/5</span>
+                            </div>
+                            <p id="p1-quiz-qtext" class="text-xs sm:text-sm font-semibold text-white mb-3 min-h-[40px]">Loading...</p>
+                            <div id="p1-quiz-opts" class="space-y-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- Pemain 2 Kuis Box (Kanan) -->
+                    <div class="bg-slate-900/90 p-4 rounded-2xl border-2 border-cyan-500/60 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-cyan-400 flex items-center gap-1.5"><i class="fa-solid fa-user-ninja"></i> PEMAIN 2 (KANAN)</span>
+                                <span id="p2-quiz-prog" class="text-[10px] bg-cyan-950 text-cyan-300 font-bold px-2 py-0.5 rounded border border-cyan-500/40">Soal 1/5</span>
+                            </div>
+                            <p id="p2-quiz-qtext" class="text-xs sm:text-sm font-semibold text-white mb-3 min-h-[40px]">Loading...</p>
+                            <div id="p2-quiz-opts" class="space-y-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESULT & BADGE DISPLAY (AFTER QUIZ) -->
+            <div id="badge-result-section" class="hidden flex flex-col items-center">
+                <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 text-slate-950 flex items-center justify-center text-4xl sm:text-5xl shadow-xl shadow-amber-500/30 mb-3 border-4 border-yellow-100 animate-bounce">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+                <span class="text-xs font-bold text-amber-400 tracking-widest uppercase mb-1">Lencana Penghargaan</span>
+                <h2 class="font-fredoka text-2xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-200 to-cyan-400 mb-2">
+                    MASTER JARING-JARING MAKANAN
+                </h2>
+                <p class="text-xs text-slate-300 max-w-md mb-4">
+                    Selamat! Anda telah berhasil mengidentifikasi aliran energi ekosistem dan menyelesaikan seluruh tantangan Kurikulum Merdeka IPA Biologi SMP.
+                </p>
+
+                <!-- Final Score Summary -->
+                <div id="solo-result-summary" class="grid grid-cols-2 gap-4 w-full max-w-xs mb-5">
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block uppercase">Total Skor</span>
+                        <span id="final-score-display" class="font-fredoka font-bold text-2xl text-yellow-400">0</span>
+                    </div>
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block uppercase">Apresiasi</span>
+                        <span class="font-fredoka font-bold text-xl text-emerald-400">SANGAT BAIK</span>
+                    </div>
+                </div>
+
+                <div id="battle-result-summary" class="hidden w-full max-w-md bg-slate-900/90 p-4 rounded-2xl border border-amber-500/40 mb-5 text-center">
+                    <h4 class="font-fredoka text-xl text-amber-400 font-bold mb-3 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-trophy text-yellow-400"></i> HASIL PERTANDINGAN BATTLE
+                    </h4>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500">
+                            <span class="text-xs font-bold text-emerald-400 block">PEMAIN 1</span>
+                            <span id="battle-p1-final" class="font-fredoka text-2xl text-emerald-300 font-bold">0</span>
+                        </div>
+                        <div class="p-3 rounded-xl bg-cyan-950/80 border border-cyan-500">
+                            <span class="text-xs font-bold text-cyan-400 block">PEMAIN 2</span>
+                            <span id="battle-p2-final" class="font-fredoka text-2xl text-cyan-300 font-bold">0</span>
+                        </div>
+                    </div>
+                    <div id="battle-winner-text" class="text-lg font-fredoka font-bold text-yellow-300 bg-amber-950/60 py-2 rounded-xl border border-amber-500/30">
+                        PEMAIN 1 MENANG! 🎉
+                    </div>
+                </div>
+
+                <!-- EVALUASI / PEMBAHASAN SINGKAT SOAL KUIS -->
+                <div class="w-full text-left bg-slate-900/90 border border-slate-700 p-4 rounded-2xl mb-6 max-h-52 overflow-y-auto shadow-inner">
+                    <h4 class="font-fredoka text-xs sm:text-sm text-amber-400 font-bold mb-3 flex items-center gap-2 sticky top-0 bg-slate-900/90 py-1">
+                        <i class="fa-solid fa-lightbulb"></i> PEMBAHASAN SOAL KUIS BIOLOGI
+                    </h4>
+                    <div id="quiz-review-list" class="space-y-3 text-xs text-slate-300"></div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center gap-3 w-full justify-center">
+                    <button onclick="restartGame()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-fredoka font-bold text-base shadow-lg transition active:scale-95 flex items-center gap-2">
+                        <i class="fa-solid fa-rotate-right"></i> Main Lagi
+                    </button>
+                    <button onclick="goToHomeScreen()" class="px-6 py-3 rounded-xl bg-slate-800 hover:bg-rose-950/80 hover:text-rose-300 text-slate-200 font-semibold text-base border border-slate-700 hover:border-rose-500/50 transition flex items-center gap-2">
+                        <i class="fa-solid fa-right-from-bracket"></i> Keluar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==================== JAVASCRIPT GAME LOGIC & ENGINE ==================== -->
+    <script>
+        /* ==================== CONFIG & STATE MANAGEMENT ==================== */
+        const gameState = {
+            mode: 'solo', // 'solo' or 'battle'
+            control: 'touch', // 'webcam' or 'touch'
+            currentPlayer: 1, // 1 or 2
+            p1Score: 0,
+            p2Score: 0,
+            currentLevel: 1, // 1 to 4
+            score: 0,
+            timer: 120,
+            timerInterval: null,
+            webcamActive: false,
+            webcamActivationActive: false,
+            activationProgress: 0,
+            isPinched: false,
+            pinchPos: { x: 0, y: 0 },
+            draggedCard: null,
+            
+            // Level 4 Network Connection State
+            l4Nodes: [],
+            l4Connections: [], // Solo
+            p1L4Connections: [], // Battle P1
+            p2L4Connections: [], // Battle P2
+            activeDragNode: null,
+            activeDragPlayer: 1,
+            belalangExtinct: false,
+            p1Complete: false,
+            p2Complete: false,
+            firstFinisher: null // Menolak pemain yang pertama selesai
+        };
+
+        /* Level Definitions & Organism Data */
+        const LEVEL_DATA = {
+            1: {
+                title: "LEVEL 1: RANTAI MAKANAN SAWAH",
+                timer: 90,
+                instruction: "Seret kartu makhluk hidup ke slot urutan dari Produsen hingga Apex Predator!",
+                cards: [
+                    { id: "padi", name: "Padi", emoji: "🌾", role: "Produsen", order: 1 },
+                    { id: "belalang", name: "Belalang", emoji: "🦗", role: "Konsumen I", order: 2 },
+                    { id: "katak", name: "Katak", emoji: "🐸", role: "Konsumen II", order: 3 },
+                    { id: "ular", name: "Ular", emoji: "🐍", role: "Konsumen III", order: 4 },
+                    { id: "elang", name: "Elang", emoji: "🦅", role: "Apex Predator", order: 5 }
+                ]
+            },
+            2: {
+                title: "LEVEL 2: RANTAI MAKANAN LAUT",
+                timer: 90,
+                instruction: "Susun rantai makanan laut secara berurutan berdasarkan aliran energinya!",
+                cards: [
+                    { id: "fitoplankton", name: "Fitoplankton", emoji: "🦠", role: "Produsen", order: 1 },
+                    { id: "zooplankton", name: "Zooplankton", emoji: "🦐", role: "Konsumen I", order: 2 },
+                    { id: "ikankecil", name: "Ikan Kecil", emoji: "🐟", role: "Konsumen II", order: 3 },
+                    { id: "ikanbesar", name: "Ikan Besar", emoji: "🐠", role: "Konsumen III", order: 4 },
+                    { id: "hiu", name: "Hiu", emoji: "🦈", role: "Apex Predator", order: 5 }
+                ]
+            },
+            3: {
+                title: "LEVEL 3: RANTAI MAKANAN HUTAN + JEBAKAN",
+                timer: 100,
+                instruction: "Pilih 4 makhluk hidup yang tepat & hindari kartu jebakan ekosistem lain!",
+                cards: [
+                    { id: "rumput", name: "Rumput", emoji: "🌿", role: "Produsen", order: 1, isTrap: false },
+                    { id: "rusa", name: "Rusa", emoji: "🦌", role: "Konsumen I", order: 2, isTrap: false },
+                    { id: "harimau", name: "Harimau", emoji: "🐅", role: "Apex Predator", order: 3, isTrap: false },
+                    { id: "jamur", name: "Jamur", emoji: "🍄", role: "Pengurai", order: 4, isTrap: false },
+                    { id: "kaktus", name: "Kaktus", emoji: "🌵", role: "Jebakan Gurun", order: 0, isTrap: true },
+                    { id: "beruang", name: "Beruang Kutub", emoji: "🐻", role: "Jebakan Kutub", order: 0, isTrap: true },
+                    { id: "singalaut", name: "Singa Laut", emoji: "🦦", role: "Jebakan Laut", order: 0, isTrap: true }
+                ]
+            },
+            4: {
+                title: "LEVEL 4: JARING-JARING MAKANAN SAWAH (MODE UTAMA)",
+                timer: 180,
+                instruction: "Tarik GARIS ENERGI dari makhluk yang dimakan ke pemangsanya! (Klik/Pinch & Drag)",
+                nodes: [
+                    { id: "padi", name: "Padi", emoji: "🌾", type: "Produsen", x: 14, y: 25 },
+                    { id: "rumput", name: "Rumput", emoji: "🌿", type: "Produsen", x: 14, y: 70 },
+                    { id: "belalang", name: "Belalang", emoji: "🦗", type: "Herbivora", x: 38, y: 15 },
+                    { id: "tikus", name: "Tikus", emoji: "🐭", type: "Omnivora", x: 38, y: 50 },
+                    { id: "pipit", name: "Burung Pipit", emoji: "🐦", type: "Omnivora", x: 38, y: 82 },
+                    { id: "katak", name: "Katak", emoji: "🐸", type: "Karnivora", x: 64, y: 25 },
+                    { id: "ular", name: "Ular", emoji: "🐍", type: "Karnivora", x: 64, y: 70 },
+                    { id: "elang", name: "Elang", emoji: "🦅", type: "Apex Predator", x: 86, y: 48 }
+                ],
+                validConnections: [
+                    { from: "padi", to: "belalang", bonus: false },
+                    { from: "padi", to: "tikus", bonus: false },
+                    { from: "padi", to: "pipit", bonus: false },
+                    { from: "rumput", to: "belalang", bonus: false },
+                    { from: "rumput", to: "tikus", bonus: false },
+                    { from: "belalang", to: "katak", bonus: false },
+                    { from: "belalang", to: "pipit", bonus: false },
+                    { from: "tikus", to: "ular", bonus: false },
+                    { from: "katak", to: "ular", bonus: false },
+                    { from: "ular", to: "elang", bonus: false },
+                    { from: "pipit", to: "elang", bonus: true },
+                    { from: "tikus", to: "elang", bonus: true }
+                ]
+            }
+        };
+
+        /* ==================== GAME INITIALIZATION ==================== */
+        let setupConfig = {
+            mode: 'solo',
+            control: 'touch'
+        };
+
+        function openSetupModal() {
+            playSound('pop');
+            document.getElementById('setup-modal').classList.remove('hidden');
+        }
+
+        function toggleSetupModal(show) {
+            playSound('pop');
+            const modal = document.getElementById('setup-modal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        function selectSetupOption(type, value) {
+            playSound('pop');
+            setupConfig[type] = value;
+
+            if (type === 'mode') {
+                const btnSolo = document.getElementById('opt-mode-solo');
+                const btnBattle = document.getElementById('opt-mode-battle');
+                if (value === 'solo') {
+                    btnSolo.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    btnBattle.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-amber-500 transition';
+                } else {
+                    btnSolo.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-emerald-500 transition';
+                    btnBattle.className = 'p-3 rounded-xl border-2 border-amber-500 bg-amber-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                }
+            } else if (type === 'control') {
+                const btnWebcam = document.getElementById('opt-control-webcam');
+                const btnTouch = document.getElementById('opt-control-touch');
+                if (value === 'webcam') {
+                    btnWebcam.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    btnTouch.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-amber-500 transition';
+                } else {
+                    btnWebcam.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-emerald-500 transition';
+                    btnTouch.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                }
+            }
+        }
+
+        function confirmAndStartGame() {
+            toggleSetupModal(false);
+            startGame(setupConfig.mode, setupConfig.control);
+        }
+
+        function startGame(selectedMode = 'solo', selectedControl = 'touch') {
+            playSound('pop');
+            gameState.mode = selectedMode;
+            gameState.control = selectedControl;
+            gameState.currentPlayer = 1;
+            gameState.p1Score = 0;
+            gameState.p2Score = 0;
+            gameState.score = 0;
+
+            document.getElementById('splash-screen').classList.add('hidden');
+
+            if (selectedMode === 'battle') {
+                document.getElementById('solo-score-box').classList.add('hidden');
+                document.getElementById('battle-score-box').classList.remove('hidden');
+                document.getElementById('solo-board-container').classList.add('hidden');
+                document.getElementById('battle-board-container').classList.remove('hidden');
+            } else {
+                document.getElementById('solo-score-box').classList.remove('hidden');
+                document.getElementById('battle-score-box').classList.add('hidden');
+                document.getElementById('solo-board-container').classList.remove('hidden');
+                document.getElementById('battle-board-container').classList.add('hidden');
+            }
+
+            // Jalankan Halaman Aktivasi jika memilih Mode WebCam
+            if (selectedControl === 'webcam') {
+                showWebcamActivationScreen();
+            } else {
+                if (gameState.webcamActive) toggleWebcam();
+                document.getElementById('game-screen').classList.remove('hidden');
+                gameState.currentLevel = 1;
+                updateScoreUI();
+                loadLevel(1);
+            }
+        }
+
+        function showWebcamActivationScreen() {
+            gameState.webcamActivationActive = true;
+            gameState.activationProgress = 0;
+
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('webcam-activation-screen').classList.remove('hidden');
+            
+            updateActivationProgressUI(0);
+
+            if (!gameState.webcamActive) {
+                toggleWebcam();
+            }
+        }
+
+        function finishWebcamActivation() {
+            if (!gameState.webcamActivationActive) return;
+            playSound('win');
+            gameState.webcamActivationActive = false;
+            
+            document.getElementById('webcam-activation-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            gameState.currentLevel = 1;
+            updateScoreUI();
+            loadLevel(1);
+        }
+
+        function updateActivationProgressUI(progress) {
+            const progressBar = document.getElementById('activation-progress-bar');
+            const progressText = document.getElementById('activation-progress-text');
+            if (progressBar) progressBar.style.width = `${progress}%`;
+            if (progressText) progressText.innerText = `Progres Aktivasi: ${Math.round(progress)}%`;
+        }
+
+        function addScore(points, player = 1) {
+            if (gameState.mode === 'battle') {
+                if (player === 1) {
+                    gameState.p1Score = Math.max(0, gameState.p1Score + points);
+                } else {
+                    gameState.p2Score = Math.max(0, gameState.p2Score + points);
+                }
+            } else {
+                gameState.score = Math.max(0, gameState.score + points);
+            }
+            updateScoreUI();
+        }
+
+        function loadLevel(levelNum) {
+            gameState.currentLevel = levelNum;
+            gameState.p1Complete = false;
+            gameState.p2Complete = false;
+            gameState.firstFinisher = null;
+            const data = LEVEL_DATA[levelNum];
+
+            // Reset Timer Sesuai Mode Permainan & Level
+            clearInterval(gameState.timerInterval);
+            if (gameState.control === 'webcam' || gameState.webcamActive) {
+                if (levelNum <= 3) gameState.timer = 120;
+                else if (levelNum === 4) gameState.timer = 240;
+            } else {
+                if (levelNum >= 1 && levelNum <= 3) gameState.timer = 60;
+                else if (levelNum === 4) gameState.timer = 150;
+            }
+            updateTimerUI();
+            gameState.timerInterval = setInterval(() => {
+                gameState.timer--;
+                updateTimerUI();
+                if (gameState.timer <= 0) {
+                    clearInterval(gameState.timerInterval);
+                    playSound('error');
+                    alert("Waktu habis! Menghitung skor akhir level ini.");
+                    if (gameState.currentLevel < 4) {
+                        loadLevel(gameState.currentLevel + 1);
+                    } else {
+                        triggerVictoryModal();
+                    }
+                }
+            }, 1000);
+
+            // Update UI Titles
+            document.getElementById('hud-level-title').innerText = data.title;
+            const instructionEl = document.getElementById('instruction-text');
+            if (instructionEl) instructionEl.innerText = data.instruction;
+            
+            // Progress Bar Update
+            const progress = ((levelNum - 1) / 4) * 100;
+            document.getElementById('hud-progress-bar').style.width = `${progress}%`;
+            document.getElementById('hud-progress-text').innerText = `${Math.round(progress)}%`;
+
+            if (gameState.mode === 'battle') {
+                renderSplitBattleBoard(data);
+            } else {
+                if (levelNum <= 3) {
+                    document.getElementById('sequence-game-area').classList.remove('hidden');
+                    document.getElementById('network-game-area').classList.add('hidden');
+                    document.getElementById('level4-controls').classList.add('hidden');
+                    document.getElementById('cards-deck-container').classList.remove('hidden');
+                    renderSequenceBoard(data);
+                } else {
+                    document.getElementById('sequence-game-area').classList.add('hidden');
+                    document.getElementById('network-game-area').classList.remove('hidden');
+                    document.getElementById('level4-controls').classList.remove('hidden');
+                    document.getElementById('cards-deck-container').classList.add('hidden');
+                    renderNetworkBoard(data);
+                }
+            }
+        }
+
+        /* ==================== SOLO MODE GAME ENGINE ==================== */
+        let soloSlotsState = [];
+
+        function renderSequenceBoard(data) {
+            const slotsContainer = document.getElementById('slots-container');
+            const cardsDeck = document.getElementById('cards-deck');
+            slotsContainer.innerHTML = '';
+            cardsDeck.innerHTML = '';
+
+            const numSlots = (gameState.currentLevel === 3) ? 4 : 5;
+            soloSlotsState = new Array(numSlots).fill(null);
+
+            // Render Target Slots
+            for (let i = 0; i < numSlots; i++) {
+                const slotEl = document.createElement('div');
+                slotEl.className = `w-16 h-20 sm:w-20 sm:h-24 rounded-2xl border-2 border-dashed border-emerald-500/50 bg-slate-900/60 flex flex-col items-center justify-center p-1 text-center relative drop-slot transition-all duration-300`;
+                slotEl.dataset.slotIdx = i;
+                slotEl.innerHTML = `
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Slot ${i+1}</span>
+                    <span class="text-[10px] text-slate-600 mt-1 font-semibold">Tarik ke sini</span>
+                `;
+
+                slotEl.addEventListener('dragover', (e) => e.preventDefault());
+                slotEl.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (gameState.draggedCard) placeCardInSlot(gameState.draggedCard, i);
+                });
+                slotsContainer.appendChild(slotEl);
+
+                // Garis panah putus-putus antar slot (Slot 1 -> Slot 2, Slot 2 -> Slot 3, dst)
+                if (i < numSlots - 1) {
+                    const arrowEl = document.createElement('div');
+                    arrowEl.className = "flex items-center justify-center w-5 sm:w-8 border-b-2 border-dashed border-emerald-400/80 relative my-auto mx-0.5 shrink-0";
+                    arrowEl.innerHTML = `<i class="fa-solid fa-caret-right text-emerald-400 absolute -right-1 text-xs sm:text-sm"></i>`;
+                    slotsContainer.appendChild(arrowEl);
+                }
+            }
+
+            // Render Cards Deck (Shuffled)
+            const shuffledCards = [...data.cards].sort(() => Math.random() - 0.5);
+            shuffledCards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `card-item w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b from-slate-800 to-slate-900 border border-emerald-500/40 rounded-2xl flex flex-col items-center justify-center p-1 text-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-105 transition-all duration-200 select-none`;
+                cardEl.draggable = true;
+                cardEl.dataset.cardId = card.id;
+
+                cardEl.innerHTML = `
+                    <span class="text-2xl sm:text-3xl mb-1 drop-shadow">${card.emoji}</span>
+                    <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${card.name}</span>
+                `;
+
+                cardEl.addEventListener('dragstart', (e) => {
+                    gameState.draggedCard = card;
+                    e.dataTransfer.setData('text/plain', card.id);
+                });
+
+                cardEl.addEventListener('click', () => {
+                    const emptyIdx = soloSlotsState.findIndex(s => s === null);
+                    if (emptyIdx !== -1) {
+                        placeCardInSlot(card, emptyIdx);
+                    }
+                });
+
+                cardsDeck.appendChild(cardEl);
+            });
+        }
+
+        function placeCardInSlot(card, slotIdx) {
+            if (card.isTrap) {
+                playSound('error');
+                addScore(-10, 1);
+                alert(`⚠️ KARTU JEBAKAN! ${card.name} bukan bagian dari ekosistem hutan (-10 Poin).`);
+                return;
+            }
+
+            const targetSlotEl = document.querySelectorAll('#slots-container .drop-slot')[slotIdx];
+
+            if (card.order === slotIdx + 1) {
+                playSound('success');
+                soloSlotsState[slotIdx] = card;
+                addScore(20, 1);
+
+                targetSlotEl.classList.remove('border-dashed', 'border-emerald-500/50');
+                targetSlotEl.classList.add('border-solid', 'border-emerald-400', 'bg-emerald-950/80', 'shadow-lg', 'shadow-emerald-500/20');
+                targetSlotEl.innerHTML = `
+                    <span class="text-2xl sm:text-3xl mb-0.5">${card.emoji}</span>
+                    <span class="font-fredoka text-[10px] sm:text-xs font-bold text-emerald-300">${card.name}</span>
+                    <span class="text-[8px] text-emerald-400/80 font-semibold uppercase">${card.role}</span>
+                `;
+
+                const deckCard = document.querySelector(`#cards-deck .card-item[data-card-id="${card.id}"]`);
+                if (deckCard) {
+                    deckCard.style.opacity = '0.3';
+                    deckCard.style.pointerEvents = 'none';
+                }
+
+                const numSlots = (gameState.currentLevel === 3) ? 4 : 5;
+                if (soloSlotsState.every(s => s !== null)) {
+                    playSound('win');
+                    setTimeout(() => {
+                        alert(`🎉 LEVEL ${gameState.currentLevel} SELESAI!\n\nLanjut ke level berikutnya!`);
+                        if (gameState.currentLevel < 4) {
+                            loadLevel(gameState.currentLevel + 1);
+                        } else {
+                            triggerVictoryModal();
+                        }
+                    }, 400);
+                }
+            } else {
+                playSound('error');
+                addScore(-10, 1);
+            }
+        }
+
+        /* Level 4 Network Board Solo Engine */
+        function renderNetworkBoard(data) {
+            const nodesContainer = document.getElementById('nodes-container');
+            const svgGroup = document.getElementById('svg-connections-group');
+            nodesContainer.innerHTML = '';
+            svgGroup.innerHTML = '';
+            gameState.l4Connections = [];
+            gameState.belalangExtinct = false;
+            document.getElementById('connected-count').innerText = "0";
+
+            data.nodes.forEach(node => {
+                const nodeEl = document.createElement('div');
+                nodeEl.id = `node-solo-${node.id}`;
+                nodeEl.dataset.nodeId = node.id;
+                nodeEl.className = `organism-node absolute w-16 h-16 sm:w-20 sm:h-20 rounded-2xl glass-light border-2 border-emerald-500 flex flex-col items-center justify-center text-center shadow-xl cursor-pointer z-20 hover:border-amber-400 select-none`;
+                nodeEl.style.left = `${node.x}%`;
+                nodeEl.style.top = `${node.y}%`;
+                nodeEl.style.transform = 'translate(-50%, -50%)';
+
+                nodeEl.innerHTML = `
+                    <span class="text-2xl sm:text-3xl mb-0.5">${node.emoji}</span>
+                    <span class="font-fredoka text-[10px] sm:text-xs font-bold text-slate-900 leading-tight">${node.name}</span>
+                    <span class="text-[8px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mt-0.5">${node.type}</span>
+                `;
+
+                nodeEl.addEventListener('mousedown', (e) => startDragLine(node.id, e));
+                nodeEl.addEventListener('mouseup', (e) => endDragLine(node.id, e));
+                
+                // Touch events
+                nodeEl.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    startDragLine(node.id, e.touches[0]);
+                });
+                nodeEl.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const targetNode = targetEl ? targetEl.closest('.organism-node') : null;
+                    if (targetNode) {
+                        endDragLine(targetNode.dataset.nodeId, touch);
+                    } else {
+                        gameState.activeDragNode = null;
+                        document.getElementById('svg-active-drag-line').classList.add('hidden');
+                    }
+                });
+
+                nodesContainer.appendChild(nodeEl);
+            });
+        }
+
+        function startDragLine(nodeId, e) {
+            if (gameState.belalangExtinct && nodeId === 'belalang') return;
+            gameState.activeDragNode = nodeId;
+            const activeLine = document.getElementById('svg-active-drag-line');
+            activeLine.classList.remove('hidden');
+            updateActiveDragLine(e);
+        }
+
+        function updateActiveDragLine(e) {
+            if (!gameState.activeDragNode) return;
+            const svgEl = document.getElementById('svg-network');
+            const rect = svgEl.getBoundingClientRect();
+            const sourceNode = LEVEL_DATA[4].nodes.find(n => n.id === gameState.activeDragNode);
+            
+            const x1 = (sourceNode.x / 100) * rect.width;
+            const y1 = (sourceNode.y / 100) * rect.height;
+            const x2 = (e.clientX || e.pageX) - rect.left;
+            const y2 = (e.clientY || e.pageY) - rect.top;
+
+            const activeLine = document.getElementById('svg-active-drag-line');
+            activeLine.setAttribute('x1', x1);
+            activeLine.setAttribute('y1', y1);
+            activeLine.setAttribute('x2', x2);
+            activeLine.setAttribute('y2', y2);
+        }
+
+        function endDragLine(targetNodeId, e) {
+            if (!gameState.activeDragNode) return;
+            const sourceId = gameState.activeDragNode;
+            gameState.activeDragNode = null;
+            document.getElementById('svg-active-drag-line').classList.add('hidden');
+
+            if (sourceId === targetNodeId) return;
+            if (gameState.belalangExtinct && (sourceId === 'belalang' || targetNodeId === 'belalang')) return;
+
+            attemptConnection(sourceId, targetNodeId);
+        }
+
+        function attemptConnection(sourceId, targetId) {
+            const pairKey = `${sourceId}->${targetId}`;
+            const validRules = LEVEL_DATA[4].validConnections;
+
+            if (gameState.l4Connections.includes(pairKey)) {
+                alert("Sudah terhubung!");
+                return;
+            }
+
+            const validMatch = validRules.find(r => r.from === sourceId && r.to === targetId);
+
+            if (validMatch) {
+                playSound('success');
+                gameState.l4Connections.push(pairKey);
+                addScore(20, 1);
+
+                drawSVGLineSolo(sourceId, targetId, validMatch.bonus);
+
+                const coreCount = gameState.l4Connections.filter(c => {
+                    const match = validRules.find(r => `${r.from}->${r.to}` === c);
+                    return match && !match.bonus;
+                }).length;
+
+                document.getElementById('connected-count').innerText = coreCount;
+            } else {
+                playSound('error');
+                addScore(-10, 1);
+                const reverseMatch = validRules.find(r => r.from === targetId && r.to === sourceId);
+                if (reverseMatch) {
+                    alert("Arah panah terbalik! Energi mengalir dari yang dimakan ke pemakan (-10 Poin).");
+                } else {
+                    alert("Koneksi tidak valid! Tidak ada hubungan makan-memakan langsung (-10 Poin).");
+                }
+            }
+        }
+
+        function drawSVGLineSolo(sourceId, targetId, isBonus) {
+            const svgGroup = document.getElementById('svg-connections-group');
+            const svgEl = document.getElementById('svg-network');
+            const rect = svgEl.getBoundingClientRect();
+
+            const sourceNode = LEVEL_DATA[4].nodes.find(n => n.id === sourceId);
+            const targetNode = LEVEL_DATA[4].nodes.find(n => n.id === targetId);
+
+            const x1 = (sourceNode.x / 100) * rect.width;
+            const y1 = (sourceNode.y / 100) * rect.height;
+            const x2 = (targetNode.x / 100) * rect.width;
+            const y2 = (targetNode.y / 100) * rect.height;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('id', `line-${sourceId}-${targetId}`);
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('class', isBonus ? 'energy-line-bonus' : 'energy-line-valid');
+            line.setAttribute('marker-end', isBonus ? 'url(#arrow-bonus)' : 'url(#arrow-green)');
+            svgGroup.appendChild(line);
+        }
+
+        function clearNetworkLines() {
+            playSound('pop');
+            gameState.l4Connections = [];
+            document.getElementById('svg-connections-group').innerHTML = '';
+            document.getElementById('connected-count').innerText = "0";
+        }
+
+        function checkJaringNetwork() {
+            const validRules = LEVEL_DATA[4].validConnections;
+            const coreCount = gameState.l4Connections.filter(c => {
+                const match = validRules.find(r => `${r.from}->${r.to}` === c);
+                return match && !match.bonus;
+            }).length;
+
+            if (coreCount >= 10) {
+                playSound('win');
+                addScore(50, 1);
+                alert("🎉 SELAMAT! Kamu Berhasil Membuat Jaring-Jaring Makanan Sawah Lengkap! (+50 Poin Bonus)");
+                setTimeout(() => {
+                    triggerVictoryModal();
+                }, 800);
+            } else {
+                playSound('error');
+                alert(`Koneksi jaring-jaring belum lengkap! Masih butuh ${10 - coreCount} koneksi utama lagi.`);
+            }
+        }
+
+        function openExtinctionModal() {
+            playSound('pop');
+            document.getElementById('extinction-modal').classList.remove('hidden');
+        }
+
+        function closeExtinctionModal() {
+            playSound('pop');
+            document.getElementById('extinction-modal').classList.add('hidden');
+        }
+
+        function answerExtinctionQuiz(isCorrect) {
+            closeExtinctionModal();
+            if (isCorrect) {
+                playSound('extinct');
+                addScore(50, 1);
+                gameState.belalangExtinct = true;
+
+                const belalangNode = document.getElementById('node-solo-belalang');
+                if (belalangNode) belalangNode.classList.add('extinct');
+
+                gameState.l4Connections = gameState.l4Connections.filter(c => {
+                    const isBelalangConn = c.includes('belalang');
+                    if (isBelalangConn) {
+                        const [src, tgt] = c.split('->');
+                        const lineEl = document.getElementById(`line-${src}-${tgt}`);
+                        if (lineEl) lineEl.remove();
+                    }
+                    return !isBelalangConn;
+                });
+
+                const validRules = LEVEL_DATA[4].validConnections;
+                const coreCount = gameState.l4Connections.filter(c => {
+                    const match = validRules.find(r => `${r.from}->${r.to}` === c);
+                    return match && !match.bonus;
+                }).length;
+                document.getElementById('connected-count').innerText = coreCount;
+
+                alert("Tepat sekali! (+50 Poin)\n\nKatak & Burung Pipit kehilangan sumber makanan utamanya. Belalang telah musnah & garis energinya terputus!");
+            } else {
+                playSound('error');
+                addScore(-10, 1);
+                alert("Jawaban belum tepat (-10 Poin). Belalang adalah makanan Katak & Pipit!");
+            }
+        }
+
+        function goToHomeScreen() {
+            playSound('pop');
+            clearInterval(gameState.timerInterval);
+            document.getElementById('victory-modal').classList.add('hidden');
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('splash-screen').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            document.getElementById('victory-modal').classList.add('hidden');
+            startGame(gameState.mode);
+        }
+
+        // Global mouse listeners for network line drawing
+        window.addEventListener('mousemove', (e) => {
+            if (gameState.activeDragNode && gameState.currentLevel === 4) {
+                updateActiveDragLine(e);
+            }
+        });
+        window.addEventListener('mouseup', () => {
+            if (gameState.activeDragNode && gameState.currentLevel === 4) {
+                gameState.activeDragNode = null;
+                const activeLine = document.getElementById('svg-active-drag-line');
+                if (activeLine) activeLine.classList.add('hidden');
+            }
+        });
+
+        /* ==================== SPLIT SCREEN BATTLE BOARD RENDERER ==================== */
+        let p1SlotsState = [];
+        let p2SlotsState = [];
+
+        function renderSplitBattleBoard(data) {
+            const numSlots = (gameState.currentLevel === 3) ? 4 : 5;
+            p1SlotsState = new Array(numSlots).fill(null);
+            p2SlotsState = new Array(numSlots).fill(null);
+
+            if (gameState.currentLevel <= 3) {
+                document.getElementById('p1-seq-area').classList.remove('hidden');
+                document.getElementById('p2-seq-area').classList.remove('hidden');
+                document.getElementById('p1-net-area').classList.add('hidden');
+                document.getElementById('p2-net-area').classList.add('hidden');
+                document.getElementById('p1-l4-ctrl').classList.add('hidden');
+                document.getElementById('p2-l4-ctrl').classList.add('hidden');
+
+                renderPlayerSequenceArena(1, data, p1SlotsState);
+                renderPlayerSequenceArena(2, data, p2SlotsState);
+            } else {
+                document.getElementById('p1-seq-area').classList.add('hidden');
+                document.getElementById('p2-seq-area').classList.add('hidden');
+                document.getElementById('p1-net-area').classList.remove('hidden');
+                document.getElementById('p2-net-area').classList.remove('hidden');
+                document.getElementById('p1-l4-ctrl').classList.remove('hidden');
+                document.getElementById('p2-l4-ctrl').classList.remove('hidden');
+
+                renderPlayerNetworkArena(1, data);
+                renderPlayerNetworkArena(2, data);
+            }
+        }
+
+        function renderPlayerSequenceArena(player, data, slotsStateArr) {
+            const slotsContainer = document.getElementById(`p${player}-slots`);
+            const deckContainer = document.getElementById(`p${player}-deck`);
+            slotsContainer.innerHTML = '';
+            deckContainer.innerHTML = '';
+
+            const numSlots = (gameState.currentLevel === 3) ? 4 : 5;
+
+            // Slots
+            for (let i = 0; i < numSlots; i++) {
+                const slotEl = document.createElement('div');
+                slotEl.className = `w-12 h-16 sm:w-16 sm:h-20 rounded-xl border-2 border-dashed ${player === 1 ? 'border-emerald-500/50' : 'border-cyan-500/50'} bg-slate-900/60 flex flex-col items-center justify-center p-0.5 text-center relative drop-slot-p${player}`;
+                slotEl.dataset.slotIdx = i;
+                slotEl.innerHTML = `<span class="text-[8px] font-bold text-slate-500">S${i+1}</span>`;
+                
+                slotEl.addEventListener('dragover', (e) => e.preventDefault());
+                slotEl.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (gameState.draggedCard) placeCardInSlotBattle(gameState.draggedCard, i, player);
+                });
+                slotsContainer.appendChild(slotEl);
+
+                // Garis panah putus-putus antar slot (Battle Mode)
+                if (i < numSlots - 1) {
+                    const arrowEl = document.createElement('div');
+                    const colorClass = player === 1 ? 'border-emerald-400/80' : 'border-cyan-400/80';
+                    arrowEl.className = `flex items-center justify-center w-3 sm:w-5 border-b-2 border-dashed ${colorClass} relative my-auto mx-0.5 shrink-0`;
+                    arrowEl.innerHTML = `<i class="fa-solid fa-caret-right ${player === 1 ? 'text-emerald-400' : 'text-cyan-400'} absolute -right-1 text-[10px] sm:text-xs"></i>`;
+                    slotsContainer.appendChild(arrowEl);
+                }
+            }
+
+            // Cards Deck
+            const shuffled = [...data.cards].sort(() => Math.random() - 0.5);
+            shuffled.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `w-12 h-16 sm:w-16 sm:h-20 bg-slate-800 border ${player === 1 ? 'border-emerald-500/40' : 'border-cyan-500/40'} rounded-xl flex flex-col items-center justify-center p-0.5 text-center cursor-grab active:cursor-grabbing shadow card-item-p${player}`;
+                cardEl.draggable = true;
+                cardEl.dataset.cardId = card.id;
+
+                cardEl.innerHTML = `
+                    <span class="text-base sm:text-xl mb-0.5">${card.emoji}</span>
+                    <span class="font-fredoka text-[8px] sm:text-[10px] font-bold text-white leading-tight">${card.name}</span>
+                `;
+
+                cardEl.addEventListener('dragstart', (e) => {
+                    gameState.draggedCard = card;
+                    e.dataTransfer.setData('text/plain', card.id);
+                });
+
+                deckContainer.appendChild(cardEl);
+            });
+        }
+
+        function placeCardInSlotBattle(card, slotIdx, player) {
+            const slotsState = (player === 1) ? p1SlotsState : p2SlotsState;
+            
+            if (card.isTrap) {
+                playSound('error');
+                addScore(-10, player);
+                alert(`⚠️ PEMAIN ${player}: KARTU JEBAKAN! ${card.name} bukan bagian dari ekosistem hutan.`);
+                return;
+            }
+
+            const targetSlotEl = document.querySelectorAll(`.drop-slot-p${player}`)[slotIdx];
+
+            if (card.order === slotIdx + 1) {
+                playSound('success');
+                slotsState[slotIdx] = card;
+                addScore(20, player);
+
+                targetSlotEl.classList.add('border-solid', 'bg-emerald-950/60');
+                targetSlotEl.innerHTML = `
+                    <span class="text-2xl">${card.emoji}</span>
+                    <span class="font-fredoka text-[9px] font-bold text-white">${card.name}</span>
+                `;
+
+                const deckCard = document.querySelector(`.card-item-p${player}[data-card-id="${card.id}"]`);
+                if (deckCard) deckCard.style.visibility = 'hidden';
+
+                const numSlots = (gameState.currentLevel === 3) ? 4 : 5;
+                if (slotsState.every(s => s !== null)) {
+                    if (player === 1) gameState.p1Complete = true;
+                    if (player === 2) gameState.p2Complete = true;
+
+                    // Aturan Baru: Pemain pertama selesai dapat bonus poin & langsung membawa permainan ke level berikutnya
+                    if (!gameState.firstFinisher) {
+                        gameState.firstFinisher = player;
+                        const speedBonus = 30;
+                        addScore(speedBonus, player);
+                        playSound('win');
+
+                        const nextLvl = gameState.currentLevel + 1;
+                        alert(`⚡ PEMAIN ${player} SELESAI PERTAMA!\n\n+${speedBonus} Poin Bonus Kecepatan!\nLangsung meluncur ke Level ${nextLvl}...`);
+
+                        setTimeout(() => {
+                            if (gameState.currentLevel < 4) {
+                                loadLevel(nextLvl);
+                            } else {
+                                triggerVictoryModal();
+                            }
+                        }, 500);
+                    }
+                }
+            } else {
+                playSound('error');
+                addScore(-10, player);
+            }
+        }
+
+        function renderPlayerNetworkArena(player, data) {
+            const container = document.getElementById(`nodes-p${player}`);
+            const svgGroup = document.getElementById(`svg-p${player}-connections`);
+            container.innerHTML = '';
+            svgGroup.innerHTML = '';
+            if (player === 1) gameState.p1L4Connections = [];
+            else gameState.p2L4Connections = [];
+            document.getElementById(`p${player}-conn-count`).innerText = "0";
+
+            data.nodes.forEach(node => {
+                const nodeEl = document.createElement('div');
+                nodeEl.id = `node-p${player}-${node.id}`;
+                nodeEl.className = `organism-node absolute w-10 h-10 sm:w-14 sm:h-14 rounded-xl glass-light border-2 ${player === 1 ? 'border-emerald-500' : 'border-cyan-500'} flex flex-col items-center justify-center text-center shadow cursor-pointer z-20`;
+                nodeEl.style.left = `${node.x}%`;
+                nodeEl.style.top = `${node.y}%`;
+                nodeEl.style.transform = 'translate(-50%, -50%)';
+
+                nodeEl.innerHTML = `
+                    <span class="text-xs sm:text-lg">${node.emoji}</span>
+                    <span class="font-fredoka text-[7px] sm:text-[9px] font-bold text-slate-900 leading-tight">${node.name}</span>
+                `;
+
+                nodeEl.addEventListener('mousedown', (e) => startDragLineBattle(node.id, player, e));
+                nodeEl.addEventListener('mouseup', (e) => endDragLineBattle(node.id, player, e));
+
+                container.appendChild(nodeEl);
+            });
+        }
+
+        function startDragLineBattle(nodeId, player, e) {
+            gameState.activeDragNode = nodeId;
+            gameState.activeDragPlayer = player;
+            const activeLine = document.getElementById(`svg-p${player}-active-line`);
+            activeLine.classList.remove('hidden');
+        }
+
+        function endDragLineBattle(targetNodeId, player, e) {
+            if (!gameState.activeDragNode || gameState.activeDragPlayer !== player) return;
+            const sourceId = gameState.activeDragNode;
+            gameState.activeDragNode = null;
+            document.getElementById(`svg-p${player}-active-line`).classList.add('hidden');
+
+            if (sourceId === targetNodeId) return;
+
+            attemptConnectionBattle(sourceId, targetNodeId, player);
+        }
+
+        function attemptConnectionBattle(sourceId, targetNodeId, player) {
+            const pairKey = `${sourceId}->${targetNodeId}`;
+            const pConn = (player === 1) ? gameState.p1L4Connections : gameState.p2L4Connections;
+            const validRules = LEVEL_DATA[4].validConnections;
+
+            if (pConn.includes(pairKey)) return;
+
+            const validMatch = validRules.find(r => r.from === sourceId && r.to === targetNodeId);
+
+            if (validMatch) {
+                playSound('success');
+                pConn.push(pairKey);
+                addScore(20, player);
+
+                drawSVGLineBattle(sourceId, targetNodeId, player, validMatch.bonus);
+
+                const coreCount = pConn.filter(c => {
+                    const match = validRules.find(r => `${r.from}->${r.to}` === c);
+                    return match && !match.bonus;
+                }).length;
+
+                document.getElementById(`p${player}-conn-count`).innerText = coreCount;
+            } else {
+                playSound('error');
+                addScore(-10, player);
+            }
+        }
+
+        function drawSVGLineBattle(sourceId, targetId, player, isBonus) {
+            const svgGroup = document.getElementById(`svg-p${player}-connections`);
+            const pNet = document.getElementById(`p${player}-net-area`);
+            const rect = pNet.getBoundingClientRect();
+
+            const sourceNode = LEVEL_DATA[4].nodes.find(n => n.id === sourceId);
+            const targetNode = LEVEL_DATA[4].nodes.find(n => n.id === targetId);
+
+            const x1 = (sourceNode.x / 100) * rect.width;
+            const y1 = (sourceNode.y / 100) * rect.height;
+            const x2 = (targetNode.x / 100) * rect.width;
+            const y2 = (targetNode.y / 100) * rect.height;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('class', isBonus ? 'energy-line-bonus' : 'energy-line-valid');
+            svgGroup.appendChild(line);
+        }
+
+        function checkJaringNetworkForPlayer(player) {
+            const pConn = (player === 1) ? gameState.p1L4Connections : gameState.p2L4Connections;
+            const validRules = LEVEL_DATA[4].validConnections;
+            const coreCount = pConn.filter(c => {
+                const match = validRules.find(r => `${r.from}->${r.to}` === c);
+                return match && !match.bonus;
+            }).length;
+
+            if (coreCount >= 10) {
+                if (player === 1) gameState.p1Complete = true;
+                if (player === 2) gameState.p2Complete = true;
+
+                // Aturan Baru untuk Level 4: Pemain pertama selesai dapat bonus +50 poin kecepatan & langsung selesai
+                if (!gameState.firstFinisher) {
+                    gameState.firstFinisher = player;
+                    const speedBonus = 50;
+                    addScore(50 + speedBonus, player); // 50 poin jaringan + 50 poin bonus kecepatan
+                    playSound('win');
+
+                    alert(`🏆 PEMAIN ${player} SELESAI PERTAMA DI LEVEL 4!\n\n+50 Poin Jaring + 50 Poin Bonus Kecepatan!\nMenuju Evaluasi Pemahaman...`);
+
+                    setTimeout(() => {
+                        triggerVictoryModal();
+                    }, 500);
+                } else {
+                    playSound('win');
+                    addScore(50, player);
+                    alert(`🎉 PEMAIN ${player} BERHASIL MEMBUAT JARING-JARING MAKANAN! (+50 Poin)`);
+                }
+            } else {
+                alert(`PEMAIN ${player}: Masih ada koneksi utama yang belum dibuat (${coreCount}/10).`);
+            }
+        }
+
+        function triggerVictoryModal() {
+            document.getElementById('victory-modal').classList.remove('hidden');
+        }
+
+        /* ==================== HELPER UI UPDATES ==================== */
+        function updateScoreUI() {
+            document.getElementById('hud-score').innerText = gameState.score;
+            document.getElementById('hud-p1-score').innerText = gameState.p1Score;
+            document.getElementById('hud-p2-score').innerText = gameState.p2Score;
+            
+            const p1Badge = document.getElementById('p1-side-score-badge');
+            const p2Badge = document.getElementById('p2-side-score-badge');
+            if (p1Badge) p1Badge.innerText = `Skor: ${gameState.p1Score}`;
+            if (p2Badge) p2Badge.innerText = `Skor: ${gameState.p2Score}`;
+        }
+
+        function updateTimerUI() {
+            document.getElementById('hud-timer').innerText = `${gameState.timer}s`;
+        }
+
+        function toggleGuideModal(show) {
+            playSound('pop');
+            const modal = document.getElementById('guide-modal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+
+        /* ==================== 5 SOAL KUIS BIOLOGI & KUIS 2 PEMAIN (BATTLE) ==================== */
+        const quizQuestions = [
+            {
+                question: "Mengapa Jaring-Jaring Makanan membuat suatu ekosistem jauh lebih STABIL dibanding Rantai Makanan sederhana?",
+                options: [
+                    "A. Karena jumlah produsen selalu lebih banyak dibanding konsumen.",
+                    "B. Karena konsumen memiliki alternatif makanan lain jika salah satu populasi berkurang.",
+                    "C. Karena hewan predator puncak tidak bisa punah."
+                ],
+                correct: 1,
+                explanation: "Keanekaragaman pilihan makanan menjaga rantai energi tetap berlangsung meskipun salah satu spesies mengalami penurunan populasi."
+            },
+            {
+                question: "Organisme yang mampu menghasilkan makanannya sendiri dari bahan anorganik melalui fotosintesis disebut...",
+                options: [
+                    "A. Produsen / Autotrof",
+                    "B. Konsumen Primer / Herbivora",
+                    "C. Pengurai / Dekomposer"
+                ],
+                correct: 0,
+                explanation: "Produsen (autotrof) seperti tumbuhan dan fitoplankton mampu mengubah energi cahaya menjadi energi kimia (makanan) sendiri."
+            },
+            {
+                question: "Dalam Piramida Energi, tingkatan ekosistem yang menyimpan jumlah energi paling BESAR adalah...",
+                options: [
+                    "A. Apex Predator (Elang / Hiu)",
+                    "B. Konsumen Sekunder (Katak / Ular)",
+                    "C. Produsen (Padi / Rumput / Fitoplankton)"
+                ],
+                correct: 2,
+                explanation: "Produsen berada di dasar piramida energi dengan tingkat energi 100%, di mana hanya sekitar 10% energi yang ditransfer ke tingkat di atasnya."
+            },
+            {
+                question: "Jika populasi Ular di ekosistem sawah menurun drastis akibat diburu manusia, dampak langsung yang terjadi adalah...",
+                options: [
+                    "A. Populasi Tikus dan Katak akan melonjak drastis.",
+                    "B. Populasi Padi akan langsung bertambah subur.",
+                    "C. Populasi Elang akan berkembang biak semakin cepat."
+                ],
+                correct: 0,
+                explanation: "Tanpa pemangsa alami seperti Ular, populasi hama Tikus dan Katak akan meningkat pesat tanpa kendali."
+            },
+            {
+                question: "Jamur dan Bakteri dalam jaring-jaring makanan berperan sangat penting sebagai...",
+                options: [
+                    "A. Produsen sekunder penyedia energi.",
+                    "B. Pengurai (Dekomposer) yang membusukkan materi organik menjadi hara tanah.",
+                    "C. Konsumen tingkat akhir pemangsa bangkai."
+                ],
+                correct: 1,
+                explanation: "Dekomposer menguraikan sisa organisme mati menjadi unsur hara hara tanah yang dibutuhkan produsen untuk tumbuh."
+            }
+        ];
+
+        const quizState = {
+            soloIdx: 0,
+            p1Idx: 0,
+            p2Idx: 0,
+            p1Done: false,
+            p2Done: false,
+            soloQuestions: [],
+            p1Questions: [],
+            p2Questions: []
+        };
+
+        function triggerVictoryModal() {
+            quizState.soloIdx = 0;
+            quizState.p1Idx = 0;
+            quizState.p2Idx = 0;
+            quizState.p1Done = false;
+            quizState.p2Done = false;
+
+            // Randomize pertanyaan kuis secara independen untuk Mode Solo dan Mode Battle (P1 & P2 beda urutan)
+            quizState.soloQuestions = [...quizQuestions].sort(() => Math.random() - 0.5);
+            quizState.p1Questions = [...quizQuestions].sort(() => Math.random() - 0.5);
+            
+            // Memastikan daftar pertanyaan Pemain 2 berbeda dari Pemain 1
+            let p2Shuffled = [...quizQuestions].sort(() => Math.random() - 0.5);
+            let attempts = 0;
+            while (attempts < 10 && p2Shuffled.every((q, i) => q === quizState.p1Questions[i])) {
+                p2Shuffled = [...quizQuestions].sort(() => Math.random() - 0.5);
+                attempts++;
+            }
+            quizState.p2Questions = p2Shuffled;
+
+            document.getElementById('post-quiz-section').classList.remove('hidden');
+            document.getElementById('badge-result-section').classList.add('hidden');
+            document.getElementById('victory-modal').classList.remove('hidden');
+
+            if (gameState.mode === 'battle') {
+                document.getElementById('solo-quiz-container').classList.add('hidden');
+                document.getElementById('battle-quiz-container').classList.remove('hidden');
+                document.getElementById('quiz-turn-badge').innerHTML = `<i class="fa-solid fa-users"></i> KUIS BATTLE (2 PEMAIN BERDAMPINGAN)`;
+                document.getElementById('quiz-subtitle').innerText = "Pemain 1 (Kiri) dan Pemain 2 (Kanan) menjawab 5 soal kuis secara bersamaan!";
+                renderBattleQuizP1();
+                renderBattleQuizP2();
+            } else {
+                document.getElementById('solo-quiz-container').classList.remove('hidden');
+                document.getElementById('battle-quiz-container').classList.add('hidden');
+                document.getElementById('quiz-turn-badge').innerHTML = `<i class="fa-solid fa-brain"></i> TANTANGAN AKHIR BIOLOGI`;
+                document.getElementById('quiz-subtitle').innerText = "Jawab 5 pertanyaan reflektif berikut untuk mengklaim Lencana Master Anda!";
+                renderSoloQuiz();
+            }
+        }
+
+        /* SOLO QUIZ RENDER */
+        function renderSoloQuiz() {
+            const q = quizState.soloQuestions[quizState.soloIdx];
+            document.getElementById('quiz-question-text').innerText = `${quizState.soloIdx + 1}. ${q.question}`;
+            const container = document.getElementById('quiz-options-container');
+            container.innerHTML = '';
+
+            q.options.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3.5 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs sm:text-sm font-medium transition text-slate-200 hover:text-white flex items-center justify-between";
+                btn.innerHTML = `<span>${optText}</span> <i class="fa-solid fa-chevron-right text-slate-500 text-xs"></i>`;
+                btn.onclick = () => submitSoloQuizAnswer(idx);
+                container.appendChild(btn);
+            });
+        }
+
+        function submitSoloQuizAnswer(selectedIdx) {
+            const q = quizState.soloQuestions[quizState.soloIdx];
+            if (selectedIdx === q.correct) {
+                playSound('success');
+                addScore(20, 1);
+            } else {
+                playSound('error');
+            }
+
+            quizState.soloIdx++;
+            if (quizState.soloIdx < quizState.soloQuestions.length) {
+                renderSoloQuiz();
+            } else {
+                finishQuiz();
+            }
+        }
+
+        /* BATTLE QUIZ RENDER (KIRI & KANAN DIACAK TERPISAH) */
+        function renderBattleQuizP1() {
+            const p1Box = document.getElementById('p1-quiz-opts');
+            if (quizState.p1Done) return;
+
+            const q = quizState.p1Questions[quizState.p1Idx];
+            document.getElementById('p1-quiz-prog').innerText = `Soal ${quizState.p1Idx + 1}/${quizState.p1Questions.length}`;
+            document.getElementById('p1-quiz-qtext').innerText = `${quizState.p1Idx + 1}. ${q.question}`;
+            p1Box.innerHTML = '';
+
+            q.options.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600/40 border border-slate-700 hover:border-emerald-400 text-xs font-medium transition text-slate-200 hover:text-white";
+                btn.innerText = optText;
+                btn.onclick = () => submitBattleQuizAnswer(1, idx);
+                p1Box.appendChild(btn);
+            });
+        }
+
+        function renderBattleQuizP2() {
+            const p2Box = document.getElementById('p2-quiz-opts');
+            if (quizState.p2Done) return;
+
+            const q = quizState.p2Questions[quizState.p2Idx];
+            document.getElementById('p2-quiz-prog').innerText = `Soal ${quizState.p2Idx + 1}/${quizState.p2Questions.length}`;
+            document.getElementById('p2-quiz-qtext').innerText = `${quizState.p2Idx + 1}. ${q.question}`;
+            p2Box.innerHTML = '';
+
+            q.options.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-2.5 rounded-xl bg-slate-800 hover:bg-cyan-600/40 border border-slate-700 hover:border-cyan-400 text-xs font-medium transition text-slate-200 hover:text-white";
+                btn.innerText = optText;
+                btn.onclick = () => submitBattleQuizAnswer(2, idx);
+                p2Box.appendChild(btn);
+            });
+        }
+
+        function submitBattleQuizAnswer(player, selectedIdx) {
+            const questions = (player === 1) ? quizState.p1Questions : quizState.p2Questions;
+            const currentIdx = (player === 1) ? quizState.p1Idx : quizState.p2Idx;
+            const q = questions[currentIdx];
+
+            if (selectedIdx === q.correct) {
+                playSound('success');
+                addScore(20, player);
+            } else {
+                playSound('error');
+            }
+
+            if (player === 1) {
+                quizState.p1Idx++;
+                if (quizState.p1Idx < quizState.p1Questions.length) {
+                    renderBattleQuizP1();
+                } else {
+                    quizState.p1Done = true;
+                    document.getElementById('p1-quiz-qtext').innerHTML = `<span class="text-emerald-400 font-bold">🎉 Pemain 1 Selesai Kuis!</span>`;
+                    document.getElementById('p1-quiz-opts').innerHTML = `<p class="text-xs text-slate-400 italic">Menunggu Pemain 2 menyelesaikan kuis...</p>`;
+                }
+            } else {
+                quizState.p2Idx++;
+                if (quizState.p2Idx < quizState.p2Questions.length) {
+                    renderBattleQuizP2();
+                } else {
+                    quizState.p2Done = true;
+                    document.getElementById('p2-quiz-qtext').innerHTML = `<span class="text-cyan-400 font-bold">🎉 Pemain 2 Selesai Kuis!</span>`;
+                    document.getElementById('p2-quiz-opts').innerHTML = `<p class="text-xs text-slate-400 italic">Menunggu Pemain 1 menyelesaikan kuis...</p>`;
+                }
+            }
+
+            if ((gameState.mode === 'battle' && quizState.p1Done && quizState.p2Done) || gameState.mode === 'solo') {
+                setTimeout(() => {
+                    finishQuiz();
+                }, 400);
+            }
+        }
+
+        function renderQuizReview() {
+            const listContainer = document.getElementById('quiz-review-list');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            quizQuestions.forEach((q, idx) => {
+                const item = document.createElement('div');
+                item.className = "p-3 bg-slate-800/80 rounded-xl border border-slate-700/60";
+                const correctOpt = q.options[q.correct];
+                item.innerHTML = `
+                    <div class="font-bold text-emerald-300 mb-1">${idx + 1}. ${q.question}</div>
+                    <div class="text-[11px] text-amber-300 font-semibold mb-1"><i class="fa-solid fa-circle-check text-emerald-400"></i> Jawaban Benar: ${correctOpt}</div>
+                    <div class="text-[11px] text-slate-300 bg-slate-900/60 p-2 rounded border border-slate-700/50"><strong class="text-amber-400">💡 Pembahasan:</strong> ${q.explanation}</div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        function finishQuiz() {
+            document.getElementById('post-quiz-section').classList.add('hidden');
+            document.getElementById('badge-result-section').classList.remove('hidden');
+
+            renderQuizReview();
+
+            if (gameState.mode === 'battle') {
+                document.getElementById('solo-result-summary').classList.add('hidden');
+                document.getElementById('battle-result-summary').classList.remove('hidden');
+                document.getElementById('battle-p1-final').innerText = gameState.p1Score;
+                document.getElementById('battle-p2-final').innerText = gameState.p2Score;
+
+                const winTxt = document.getElementById('battle-winner-text');
+                if (gameState.p1Score > gameState.p2Score) {
+                    winTxt.innerHTML = "🏆 PEMAIN 1 MENANG! 🎉";
+                    winTxt.className = "text-lg font-fredoka font-bold text-emerald-300 bg-emerald-950/80 py-2 rounded-xl border border-emerald-500/40";
+                } else if (gameState.p2Score > gameState.p1Score) {
+                    winTxt.innerHTML = "🏆 PEMAIN 2 MENANG! 🎉";
+                    winTxt.className = "text-lg font-fredoka font-bold text-cyan-300 bg-cyan-950/80 py-2 rounded-xl border border-cyan-500/40";
+                } else {
+                    winTxt.innerHTML = "HASIL SERI! 🤝";
+                    winTxt.className = "text-lg font-fredoka font-bold text-yellow-300 bg-amber-950/60 py-2 rounded-xl border border-amber-500/30";
+                }
+            } else {
+                document.getElementById('solo-result-summary').classList.remove('hidden');
+                document.getElementById('battle-result-summary').classList.add('hidden');
+                document.getElementById('final-score-display').innerText = gameState.score;
+            }
+        }
+
+
+        /* ==================== MEDIAPIPE HAND TRACKING & WEBCAM ENGINE ==================== */
+        let handsModel = null;
+        let webcamStream = null;
+        let animationFrameId = null;
+
+        async function toggleWebcam() {
+            initAudio();
+            const videoEl = document.getElementById('webcam-video');
+            const bgWallpaper = document.getElementById('bg-wallpaper');
+            const bgPattern = document.getElementById('bg-pattern');
+            const camIcon = document.getElementById('cam-icon');
+            const statusText = document.getElementById('cam-status-text');
+
+            if (gameState.webcamActive) {
+                // Turn Off Webcam
+                gameState.webcamActive = false;
+                document.body.classList.remove('webcam-active');
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                if (webcamStream) {
+                    webcamStream.getTracks().forEach(track => track.stop());
+                    webcamStream = null;
+                }
+                videoEl.srcObject = null;
+                videoEl.classList.add('hidden');
+                
+                // Tampilkan kembali background wallpaper saat webcam mati
+                if (bgWallpaper) bgWallpaper.classList.remove('hidden');
+                if (bgPattern) bgPattern.classList.remove('hidden');
+
+                camIcon.className = 'fa-solid fa-video-slash text-red-400';
+                statusText.innerText = 'Webcam Off';
+            } else {
+                // Turn On Webcam
+                try {
+                    statusText.innerText = 'Menghubungkan...';
+                    gameState.webcamActive = true;
+                    document.body.classList.add('webcam-active');
+                    
+                    await setupMediaPipeHands();
+
+                    camIcon.className = 'fa-solid fa-video text-emerald-400';
+                    statusText.innerText = 'Webcam On';
+                } catch (err) {
+                    console.error("Webcam init error:", err);
+                    gameState.webcamActive = false;
+                    document.body.classList.remove('webcam-active');
+                    videoEl.classList.add('hidden');
+
+                    // Kembalikan background jika terjadi error
+                    if (bgWallpaper) bgWallpaper.classList.remove('hidden');
+                    if (bgPattern) bgPattern.classList.remove('hidden');
+
+                    camIcon.className = 'fa-solid fa-video-slash text-red-400';
+                    statusText.innerText = 'Webcam Gagal';
+                    alert("Akses Webcam tidak dapat diaktifkan: " + (err.message || "Izin kamera ditolak atau perangkat tidak mendukung") + "\n\nPermainan otomatis dialihkan ke Mode Sentuh / Mouse.");
+                }
+            }
+        }
+
+        async function setupMediaPipeHands() {
+            const videoEl = document.getElementById('webcam-video');
+            const canvasEl = document.getElementById('tracking-canvas');
+            const bgWallpaper = document.getElementById('bg-wallpaper');
+            const bgPattern = document.getElementById('bg-pattern');
+            const ctx = canvasEl.getContext('2d');
+
+            canvasEl.width = window.innerWidth;
+            canvasEl.height = window.innerHeight;
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Peramban Anda tidak mendukung akses kamera langsung.");
+            }
+
+            // Request camera stream dengan pencarian universal
+            try {
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' },
+                    audio: false
+                });
+            } catch (e) {
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+            }
+
+            videoEl.srcObject = webcamStream;
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            
+            // Tampilkan video langsung agar tidak terjadi layar hitam saat memuat AI
+            videoEl.classList.remove('hidden');
+
+            // Tunggu hingga video siap dan memutar frame
+            await new Promise((resolve) => {
+                videoEl.onloadedmetadata = () => {
+                    videoEl.play().then(resolve).catch(resolve);
+                };
+                if (videoEl.readyState >= 1) {
+                    videoEl.play().then(resolve).catch(resolve);
+                }
+            });
+
+            // Sembunyikan wallpaper dekoratif HANYA setelah tayangan kamera aktif
+            if (bgWallpaper) bgWallpaper.classList.add('hidden');
+            if (bgPattern) bgPattern.classList.add('hidden');
+
+            // Inisialisasi MediaPipe Hands
+            if (typeof Hands !== 'undefined') {
+                try {
+                    if (!handsModel) {
+                        handsModel = new Hands({
+                            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                        });
+
+                        handsModel.setOptions({
+                            maxNumHands: 1,
+                            modelComplexity: 0,
+                            minDetectionConfidence: 0.5,
+                            minTrackingConfidence: 0.5
+                        });
+
+                        handsModel.onResults((results) => {
+                            ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+                            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                                const landmarks = results.multiHandLandmarks[0];
+                                const thumb = landmarks[4];
+                                const index = landmarks[8];
+
+                                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+                                const isPinchNow = pinchDist < 0.07;
+
+                                // Perhitungan presisi kordinat dengan menyesuaikan Object-Cover & CSS Mirroring
+                                const screenW = window.innerWidth;
+                                const screenH = window.innerHeight;
+                                const vWidth = videoEl.videoWidth || 640;
+                                const vHeight = videoEl.videoHeight || 480;
+
+                                const screenAspect = screenW / screenH;
+                                const videoAspect = vWidth / vHeight;
+
+                                let scaledW, scaledH, offsetX = 0, offsetY = 0;
+
+                                if (screenAspect > videoAspect) {
+                                    // Layar lebih lebar dari video: pemotongan atas-bawah (object-cover)
+                                    const scale = screenW / vWidth;
+                                    scaledW = screenW;
+                                    scaledH = vHeight * scale;
+                                    offsetY = (scaledH - screenH) / 2;
+                                } else {
+                                    // Layar lebih tinggi dari video: pemotongan kiri-kanan (object-cover)
+                                    const scale = screenH / vHeight;
+                                    scaledW = vWidth * scale;
+                                    scaledH = screenH;
+                                    offsetX = (scaledW - screenW) / 2;
+                                }
+
+                                // Posisi horizontal & vertikal presisi sesuai skala layar
+                                const vx = index.x * scaledW - offsetX;
+                                const vy = index.y * scaledH - offsetY;
+
+                                // Menggambar pada canvas internal (akan diputar secara otomatis oleh CSS .mirror)
+                                const drawX = vx;
+                                const drawY = vy;
+
+                                // Posisi sebenarnya pada layar UI (CSS Screen Coordinates)
+                                const screenX = screenW - vx;
+                                const screenY = vy;
+
+                                gameState.pinchPos = { x: screenX, y: screenY };
+
+                                ctx.beginPath();
+                                ctx.arc(drawX, drawY, isPinchNow ? 18 : 12, 0, 2 * Math.PI);
+                                ctx.fillStyle = isPinchNow ? '#10B981' : '#F59E0B';
+                                ctx.fill();
+                                ctx.lineWidth = 3;
+                                ctx.strokeStyle = '#FFFFFF';
+                                ctx.stroke();
+
+                                handleVirtualHandInteraction(screenX, screenY, isPinchNow);
+                                gameState.isPinched = isPinchNow;
+                            } else {
+                                // Sembunyikan kartu melayang jika tangan tidak terdeteksi
+                                const floatingCard = document.getElementById('webcam-floating-card');
+                                if (floatingCard) floatingCard.classList.add('hidden');
+                            }
+                        });
+                    }
+                } catch (mpErr) {
+                    console.warn("Peringatan inisialisasi MediaPipe Hands:", mpErr);
+                }
+            }
+
+            // Loop Pengiriman Frame Video
+            async function processVideoFrame() {
+                if (!gameState.webcamActive) return;
+
+                if (handsModel && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+                    try {
+                        await handsModel.send({ image: videoEl });
+                    } catch (e) {
+                        // Abaikan error sementara per frame
+                    }
+                }
+                animationFrameId = requestAnimationFrame(processVideoFrame);
+            }
+
+            processVideoFrame();
+        }
+
+        function handleVirtualHandInteraction(x, y, isPinched) {
+            const targetEl = document.elementFromPoint(x, y);
+            const floatingCard = document.getElementById('webcam-floating-card');
+
+            // INTERAKSI HALAMAN AKTIVASI SENSOR WEBCAM
+            if (gameState.webcamActivationActive) {
+                const badge = document.getElementById('activation-status-badge');
+                const badgeText = document.getElementById('activation-status-text');
+                const pingDot = document.getElementById('activation-ping-dot');
+                const targetZone = document.getElementById('activation-target-zone');
+                const targetIcon = document.getElementById('activation-target-icon');
+
+                if (badgeText) {
+                    badgeText.innerText = "Tangan Terdeteksi! Tempelkan Jempol & Telunjuk";
+                    if (badge) badge.className = "inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-950 border border-teal-400 text-teal-300 text-xs font-bold mb-5 transition-all duration-300";
+                    if (pingDot) pingDot.className = "w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping";
+                }
+
+                if (isPinched) {
+                    gameState.activationProgress = Math.min(100, gameState.activationProgress + 2.5);
+                    updateActivationProgressUI(gameState.activationProgress);
+
+                    if (targetZone) {
+                        targetZone.classList.add('scale-110', 'border-amber-400', 'bg-amber-950/60', 'shadow-amber-500/50');
+                    }
+                    if (targetIcon) {
+                        targetIcon.className = "text-4xl sm:text-5xl mb-2 text-amber-400 scale-125 transition-transform duration-150";
+                    }
+
+                    if (gameState.activationProgress >= 100) {
+                        finishWebcamActivation();
+                    }
+                } else {
+                    gameState.activationProgress = Math.max(0, gameState.activationProgress - 1);
+                    updateActivationProgressUI(gameState.activationProgress);
+
+                    if (targetZone) {
+                        targetZone.classList.remove('scale-110', 'border-amber-400', 'bg-amber-950/60', 'shadow-amber-500/50');
+                    }
+                    if (targetIcon) {
+                        targetIcon.className = "text-4xl sm:text-5xl mb-2 text-emerald-400 transition-transform duration-150";
+                    }
+                }
+                return;
+            }
+
+            // Interaksi Level 1-3 (Drag & Drop Kartu)
+            if (gameState.currentLevel <= 3) {
+                const cardEl = targetEl ? (targetEl.closest('.card-item') || targetEl.closest('.card-item-p1') || targetEl.closest('.card-item-p2')) : null;
+                const slotEl = targetEl ? (targetEl.closest('.drop-slot') || targetEl.closest('.drop-slot-p1') || targetEl.closest('.drop-slot-p2')) : null;
+
+                // Reset indikator animasi pada seluruh slot
+                document.querySelectorAll('.drop-slot, .drop-slot-p1, .drop-slot-p2').forEach(s => s.classList.remove('slot-hover-active'));
+
+                if (isPinched) {
+                    if (cardEl && !gameState.draggedCard) {
+                        const cardId = cardEl.dataset.cardId;
+                        const cardObj = LEVEL_DATA[gameState.currentLevel].cards.find(c => c.id === cardId);
+                        if (cardObj) {
+                            gameState.draggedCard = cardObj;
+                            playSound('pop');
+                        }
+                    }
+
+                    // Tampilkan & geser kartu mengikuti pergerakan kursor tangan di Mode WebCam
+                    if (gameState.draggedCard) {
+                        if (floatingCard) {
+                            floatingCard.innerHTML = `
+                                <div class="w-20 h-24 sm:w-24 sm:h-28 bg-gradient-to-b from-emerald-600 via-teal-700 to-slate-900 border-2 border-amber-400 rounded-2xl flex flex-col items-center justify-center p-2 text-center shadow-2xl shadow-amber-500/60 scale-110 -rotate-3 animate-pulse">
+                                    <span class="text-3xl sm:text-4xl mb-1 filter drop-shadow-md">${gameState.draggedCard.emoji}</span>
+                                    <span class="font-fredoka text-xs font-bold text-white leading-tight">${gameState.draggedCard.name}</span>
+                                    <span class="text-[9px] font-bold text-amber-300 uppercase tracking-wider mt-1 bg-amber-950/90 px-2 py-0.5 rounded-full border border-amber-400/60 flex items-center gap-1 shadow">
+                                        <i class="fa-solid fa-hand-back-fist text-[8px]"></i> TERAMBIL
+                                    </span>
+                                </div>
+                            `;
+                            floatingCard.style.left = `${x}px`;
+                            floatingCard.style.top = `${y}px`;
+                            floatingCard.classList.remove('hidden');
+                        }
+
+                        // Tambahkan animasi denyut bersinar jika kartu berada di atas slot
+                        if (slotEl) {
+                            slotEl.classList.add('slot-hover-active');
+                        }
+                    }
+                } else {
+                    if (gameState.draggedCard) {
+                        if (slotEl) {
+                            const slotIdx = parseInt(slotEl.dataset.slotIdx);
+                            if (gameState.mode === 'battle') {
+                                const isP1Slot = slotEl.classList.contains('drop-slot-p1');
+                                placeCardInSlotBattle(gameState.draggedCard, slotIdx, isP1Slot ? 1 : 2);
+                            } else {
+                                placeCardInSlot(gameState.draggedCard, slotIdx);
+                            }
+                        }
+                        gameState.draggedCard = null;
+                        if (floatingCard) floatingCard.classList.add('hidden');
+                    }
+                }
+            } 
+            // Interaksi Level 4 (Tarik Garis Jaring Makanan)
+            else if (gameState.currentLevel === 4) {
+                if (floatingCard) floatingCard.classList.add('hidden');
+                const nodeEl = targetEl ? targetEl.closest('.organism-node') : null;
+                if (isPinched && nodeEl && !gameState.activeDragNode) {
+                    const nodeId = nodeEl.dataset.nodeId || nodeEl.id.replace('node-solo-', '').replace('node-p1-', '').replace('node-p2-', '');
+                    if (gameState.mode === 'battle') {
+                        const isP1Node = nodeEl.id.includes('p1');
+                        startDragLineBattle(nodeId, isP1Node ? 1 : 2, { clientX: x, clientY: y });
+                    } else {
+                        startDragLine(nodeId, { clientX: x, clientY: y });
+                    }
+                } else if (gameState.activeDragNode) {
+                    if (gameState.mode === 'battle') {
+                        const activeLine = document.getElementById(`svg-p${gameState.activeDragPlayer}-active-line`);
+                        if (activeLine) activeLine.classList.remove('hidden');
+                    } else {
+                        updateActiveDragLine({ clientX: x, clientY: y });
+                    }
+                    
+                    if (!isPinched && nodeEl) {
+                        const targetId = nodeEl.dataset.nodeId || nodeEl.id.replace('node-solo-', '').replace('node-p1-', '').replace('node-p2-', '');
+                        if (gameState.mode === 'battle') {
+                            endDragLineBattle(targetId, gameState.activeDragPlayer, { clientX: x, clientY: y });
+                        } else {
+                            endDragLine(targetId, { clientX: x, clientY: y });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Window Resize Listener for Responsive Canvas
+        window.addEventListener('resize', () => {
+            const canvasEl = document.getElementById('tracking-canvas');
+            if (canvasEl) {
+                canvasEl.width = window.innerWidth;
+                canvasEl.height = window.innerHeight;
+            }
+        });
+    </script>
+</body>
+</html>
