@@ -1263,23 +1263,37 @@
                     <span class="text-[10px] text-slate-600 mt-1 font-semibold">Tarik ke sini</span>
                 `;
 
-                slotEl.addEventListener('dragover', (e) => e.preventDefault());
+                // Animasi Hover / Slot Pulse saat Kartu Dilewati
+                slotEl.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    slotEl.classList.add('slot-hover-active');
+                });
+                slotEl.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (!slotEl.classList.contains('slot-hover-active')) {
+                        slotEl.classList.add('slot-hover-active');
+                    }
+                });
+                slotEl.addEventListener('dragleave', () => {
+                    slotEl.classList.remove('slot-hover-active');
+                });
                 slotEl.addEventListener('drop', (e) => {
                     e.preventDefault();
+                    slotEl.classList.remove('slot-hover-active');
                     if (gameState.draggedCard) placeCardInSlot(gameState.draggedCard, i);
                 });
                 slotsContainer.appendChild(slotEl);
 
-                // Garis panah putus-putus antar slot (Slot 1 -> Slot 2, Slot 2 -> Slot 3, dst)
+                // Garis panah putus-putus antar slot
                 if (i < numSlots - 1) {
                     const arrowEl = document.createElement('div');
-                    arrowEl.className = "flex items-center justify-center w-5 sm:w-8 border-b-2 border-dashed border-emerald-400/80 relative my-auto mx-0.5 shrink-0";
+                    arrowEl.className = 'flex items-center justify-center w-4 sm:w-6 border-b-2 border-dashed border-emerald-400/80 relative my-auto mx-1 shrink-0';
                     arrowEl.innerHTML = `<i class="fa-solid fa-caret-right text-emerald-400 absolute -right-1 text-xs sm:text-sm"></i>`;
                     slotsContainer.appendChild(arrowEl);
                 }
             }
 
-            // Render Cards Deck (Shuffled)
+            // Cards Deck (Shuffled)
             const shuffledCards = [...data.cards].sort(() => Math.random() - 0.5);
             shuffledCards.forEach(card => {
                 const cardEl = document.createElement('div');
@@ -1295,6 +1309,24 @@
                 cardEl.addEventListener('dragstart', (e) => {
                     gameState.draggedCard = card;
                     e.dataTransfer.setData('text/plain', card.id);
+                });
+
+                cardEl.addEventListener('dragend', () => {
+                    document.querySelectorAll('#slots-container .drop-slot').forEach(s => s.classList.remove('slot-hover-active'));
+                });
+
+                // Touch Drag Handler untuk Layar Sentuh Mode Solo
+                cardEl.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    startTouchDragCardSolo(card, touch);
+                }, { passive: false });
+
+                // Mouse Drag Handler untuk Mode Sentuh (Desktop/Laptop)
+                cardEl.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    startMouseDragCardSolo(card, e);
                 });
 
                 cardEl.addEventListener('click', () => {
@@ -1588,51 +1620,6 @@
             startGame(gameState.mode);
         }
 
-        // Global mouse listeners for network line drawing
-        window.addEventListener('mousemove', (e) => {
-            if (gameState.activeDragNode && gameState.currentLevel === 4) {
-                updateActiveDragLine(e);
-            }
-            if (gameState.mode === 'battle' && gameState.currentLevel === 4) {
-                if (gameState.activeDragNodeP1) updateActiveDragLineBattle(1, e);
-                if (gameState.activeDragNodeP2) updateActiveDragLineBattle(2, e);
-            }
-        });
-        window.addEventListener('mouseup', () => {
-            if (gameState.activeDragNode && gameState.currentLevel === 4) {
-                gameState.activeDragNode = null;
-                const activeLine = document.getElementById('svg-active-drag-line');
-                if (activeLine) activeLine.classList.add('hidden');
-            }
-            if (gameState.mode === 'battle' && gameState.currentLevel === 4) {
-                if (gameState.activeDragNodeP1) {
-                    gameState.activeDragNodeP1 = null;
-                    const line1 = document.getElementById('svg-p1-active-line');
-                    if (line1) line1.classList.add('hidden');
-                }
-                if (gameState.activeDragNodeP2) {
-                    gameState.activeDragNodeP2 = null;
-                    const line2 = document.getElementById('svg-p2-active-line');
-                    if (line2) line2.classList.add('hidden');
-                }
-            }
-        });
-
-        // Global Multi-Touch Listener for Level 4 Network Lines in Battle Mode
-        window.addEventListener('touchmove', (e) => {
-            if (gameState.mode === 'battle' && gameState.currentLevel === 4) {
-                for (let i = 0; i < e.touches.length; i++) {
-                    const t = e.touches[i];
-                    const player = (t.clientX < window.innerWidth / 2) ? 1 : 2;
-                    if (player === 1 && gameState.activeDragNodeP1) {
-                        updateActiveDragLineBattle(1, t);
-                    } else if (player === 2 && gameState.activeDragNodeP2) {
-                        updateActiveDragLineBattle(2, t);
-                    }
-                }
-            }
-        }, { passive: false });
-
         /* ==================== SPLIT SCREEN BATTLE BOARD RENDERER ==================== */
         let p1SlotsState = [];
         let p2SlotsState = [];
@@ -1676,13 +1663,27 @@
             // Slots
             for (let i = 0; i < numSlots; i++) {
                 const slotEl = document.createElement('div');
-                slotEl.className = `w-12 h-16 sm:w-16 sm:h-20 rounded-xl border-2 border-dashed ${player === 1 ? 'border-emerald-500/50' : 'border-cyan-500/50'} bg-slate-900/60 flex flex-col items-center justify-center p-0.5 text-center relative drop-slot-p${player}`;
+                slotEl.className = `w-12 h-16 sm:w-16 sm:h-20 rounded-xl border-2 border-dashed ${player === 1 ? 'border-emerald-500/50' : 'border-cyan-500/50'} bg-slate-900/60 flex flex-col items-center justify-center p-0.5 text-center relative drop-slot-p${player} transition-all duration-300`;
                 slotEl.dataset.slotIdx = i;
                 slotEl.innerHTML = `<span class="text-[8px] font-bold text-slate-500">S${i+1}</span>`;
                 
-                slotEl.addEventListener('dragover', (e) => e.preventDefault());
+                // Animasi Hover / Slot Pulse saat Kartu Dilewati
+                slotEl.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    slotEl.classList.add('slot-hover-active');
+                });
+                slotEl.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (!slotEl.classList.contains('slot-hover-active')) {
+                        slotEl.classList.add('slot-hover-active');
+                    }
+                });
+                slotEl.addEventListener('dragleave', () => {
+                    slotEl.classList.remove('slot-hover-active');
+                });
                 slotEl.addEventListener('drop', (e) => {
                     e.preventDefault();
+                    slotEl.classList.remove('slot-hover-active');
                     const card = player === 1 ? gameState.draggedCardP1 : gameState.draggedCardP2;
                     if (card) placeCardInSlotBattle(card, i, player);
                 });
@@ -1724,6 +1725,13 @@
                     startTouchDragCard(card, player, touch);
                 }, { passive: false });
 
+                // Mouse Drag Handler for Battle Mode
+                cardEl.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    startMouseDragCard(card, player, e);
+                });
+
                 cardEl.addEventListener('click', () => {
                     const slotsState = (player === 1) ? p1SlotsState : p2SlotsState;
                     const emptyIdx = slotsState.findIndex(s => s === null);
@@ -1734,6 +1742,136 @@
 
                 deckContainer.appendChild(cardEl);
             });
+        }
+
+        /* Engine Touch Drag Solo Mode */
+        function startTouchDragCardSolo(card, touch) {
+            gameState.draggedCard = card;
+            playSound('pop');
+
+            const floatingCard = document.getElementById('webcam-floating-card');
+            if (floatingCard) {
+                floatingCard.innerHTML = `
+                    <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b from-emerald-600 via-teal-700 to-slate-900 border-2 border-amber-400 rounded-2xl flex flex-col items-center justify-center p-1 text-center shadow-[0_0_25px_rgba(245,158,11,0.6)] scale-110 -rotate-3">
+                        <span class="text-2xl sm:text-3xl mb-0.5 filter drop-shadow-md">${card.emoji}</span>
+                        <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${card.name}</span>
+                        <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60 flex items-center gap-1 justify-center">
+                            ✨ TERAMBIL
+                        </span>
+                    </div>
+                `;
+                floatingCard.style.left = `${touch.clientX}px`;
+                floatingCard.style.top = `${touch.clientY}px`;
+                floatingCard.classList.remove('hidden');
+            }
+
+            const moveHandler = (moveEvt) => {
+                let currentTouch = null;
+                for (let i = 0; i < moveEvt.touches.length; i++) {
+                    if (moveEvt.touches[i].identifier === touch.identifier) {
+                        currentTouch = moveEvt.touches[i];
+                        break;
+                    }
+                }
+                if (!currentTouch) currentTouch = moveEvt.touches[0];
+
+                if (floatingCard && currentTouch) {
+                    floatingCard.style.left = `${currentTouch.clientX}px`;
+                    floatingCard.style.top = `${currentTouch.clientY}px`;
+
+                    const targetEl = document.elementFromPoint(currentTouch.clientX, currentTouch.clientY);
+                    const slotEl = targetEl ? targetEl.closest('.drop-slot') : null;
+                    document.querySelectorAll('#slots-container .drop-slot').forEach(s => s.classList.remove('slot-hover-active'));
+                    if (slotEl) slotEl.classList.add('slot-hover-active');
+                }
+            };
+
+            const endHandler = (endEvt) => {
+                let endTouch = null;
+                for (let i = 0; i < endEvt.changedTouches.length; i++) {
+                    if (endEvt.changedTouches[i].identifier === touch.identifier) {
+                        endTouch = endEvt.changedTouches[i];
+                        break;
+                    }
+                }
+                if (!endTouch) endTouch = endEvt.changedTouches[0];
+
+                window.removeEventListener('touchmove', moveHandler);
+                window.removeEventListener('touchend', endHandler);
+                window.removeEventListener('touchcancel', endHandler);
+
+                document.querySelectorAll('#slots-container .drop-slot').forEach(s => s.classList.remove('slot-hover-active'));
+                if (floatingCard) floatingCard.classList.add('hidden');
+
+                if (endTouch) {
+                    const targetEl = document.elementFromPoint(endTouch.clientX, endTouch.clientY);
+                    const slotEl = targetEl ? targetEl.closest('.drop-slot') : null;
+                    if (slotEl) {
+                        const slotIdx = parseInt(slotEl.dataset.slotIdx);
+                        placeCardInSlot(card, slotIdx);
+                    }
+                }
+
+                gameState.draggedCard = null;
+            };
+
+            window.addEventListener('touchmove', moveHandler, { passive: false });
+            window.addEventListener('touchend', endHandler, { passive: false });
+            window.addEventListener('touchcancel', endHandler, { passive: false });
+        }
+
+        /* Mouse Drag Engine Solo Mode */
+        function startMouseDragCardSolo(card, mouseEvent) {
+            gameState.draggedCard = card;
+            playSound('pop');
+
+            const floatingCard = document.getElementById('webcam-floating-card');
+            if (floatingCard) {
+                floatingCard.innerHTML = `
+                    <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b from-emerald-600 via-teal-700 to-slate-900 border-2 border-amber-400 rounded-2xl flex flex-col items-center justify-center p-1 text-center shadow-[0_0_25px_rgba(245,158,11,0.6)] scale-110 -rotate-3">
+                        <span class="text-2xl sm:text-3xl mb-0.5 filter drop-shadow-md">${card.emoji}</span>
+                        <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${card.name}</span>
+                        <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60 flex items-center gap-1 justify-center">
+                            ✨ TERAMBIL
+                        </span>
+                    </div>
+                `;
+                floatingCard.style.left = `${mouseEvent.clientX}px`;
+                floatingCard.style.top = `${mouseEvent.clientY}px`;
+                floatingCard.classList.remove('hidden');
+            }
+
+            const moveHandler = (moveEvt) => {
+                if (floatingCard) {
+                    floatingCard.style.left = `${moveEvt.clientX}px`;
+                    floatingCard.style.top = `${moveEvt.clientY}px`;
+
+                    const targetEl = document.elementFromPoint(moveEvt.clientX, moveEvt.clientY);
+                    const slotEl = targetEl ? targetEl.closest('.drop-slot') : null;
+                    document.querySelectorAll('#slots-container .drop-slot').forEach(s => s.classList.remove('slot-hover-active'));
+                    if (slotEl) slotEl.classList.add('slot-hover-active');
+                }
+            };
+
+            const upHandler = (upEvt) => {
+                window.removeEventListener('mousemove', moveHandler);
+                window.removeEventListener('mouseup', upHandler);
+
+                document.querySelectorAll('#slots-container .drop-slot').forEach(s => s.classList.remove('slot-hover-active'));
+                if (floatingCard) floatingCard.classList.add('hidden');
+
+                const targetEl = document.elementFromPoint(upEvt.clientX, upEvt.clientY);
+                const slotEl = targetEl ? targetEl.closest('.drop-slot') : null;
+                if (slotEl) {
+                    const slotIdx = parseInt(slotEl.dataset.slotIdx);
+                    placeCardInSlot(card, slotIdx);
+                }
+
+                gameState.draggedCard = null;
+            };
+
+            window.addEventListener('mousemove', moveHandler);
+            window.addEventListener('mouseup', upHandler);
         }
 
         /* Custom Touch Drag Engine for Multi-Touch 2 Players */
@@ -1748,11 +1886,11 @@
                 const colorBorder = player === 1 ? 'border-emerald-400' : 'border-cyan-400';
                 const colorBg = player === 1 ? 'from-emerald-600 via-teal-700' : 'from-cyan-600 via-teal-700';
                 floatingCard.innerHTML = `
-                    <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b ${colorBg} to-slate-900 border-2 ${colorBorder} rounded-xl flex flex-col items-center justify-center p-1 text-center shadow-2xl scale-110 -rotate-3">
+                    <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b ${colorBg} to-slate-900 border-2 ${colorBorder} rounded-xl flex flex-col items-center justify-center p-1 text-center shadow-[0_0_25px_rgba(245,158,11,0.6)] scale-110 -rotate-3">
                         <span class="text-2xl sm:text-3xl mb-0.5 filter drop-shadow-md">${card.emoji}</span>
                         <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${card.name}</span>
-                        <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60">
-                            P${player} TERAMBIL
+                        <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60 flex items-center gap-1 justify-center">
+                            ✨ P${player} TERAMBIL
                         </span>
                     </div>
                 `;
@@ -1815,6 +1953,65 @@
             window.addEventListener('touchmove', moveHandler, { passive: false });
             window.addEventListener('touchend', endHandler, { passive: false });
             window.addEventListener('touchcancel', endHandler, { passive: false });
+        }
+
+        /* Mouse Drag Engine Battle Mode */
+        function startMouseDragCard(card, player, mouseEvent) {
+            if (player === 1) gameState.draggedCardP1 = card;
+            else gameState.draggedCardP2 = card;
+            
+            playSound('pop');
+
+            const floatingCard = document.getElementById(`webcam-floating-card-p${player}`);
+            if (floatingCard) {
+                const colorBorder = player === 1 ? 'border-emerald-400' : 'border-cyan-400';
+                const colorBg = player === 1 ? 'from-emerald-600 via-teal-700' : 'from-cyan-600 via-teal-700';
+                floatingCard.innerHTML = `
+                    <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b ${colorBg} to-slate-900 border-2 ${colorBorder} rounded-xl flex flex-col items-center justify-center p-1 text-center shadow-[0_0_25px_rgba(245,158,11,0.6)] scale-110 -rotate-3">
+                        <span class="text-2xl sm:text-3xl mb-0.5 filter drop-shadow-md">${card.emoji}</span>
+                        <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${card.name}</span>
+                        <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60 flex items-center gap-1 justify-center">
+                            ✨ P${player} TERAMBIL
+                        </span>
+                    </div>
+                `;
+                floatingCard.style.left = `${mouseEvent.clientX}px`;
+                floatingCard.style.top = `${mouseEvent.clientY}px`;
+                floatingCard.classList.remove('hidden');
+            }
+
+            const moveHandler = (moveEvt) => {
+                if (floatingCard) {
+                    floatingCard.style.left = `${moveEvt.clientX}px`;
+                    floatingCard.style.top = `${moveEvt.clientY}px`;
+
+                    const targetEl = document.elementFromPoint(moveEvt.clientX, moveEvt.clientY);
+                    const slotEl = targetEl ? targetEl.closest(`.drop-slot-p${player}`) : null;
+                    document.querySelectorAll(`.drop-slot-p${player}`).forEach(s => s.classList.remove('slot-hover-active'));
+                    if (slotEl) slotEl.classList.add('slot-hover-active');
+                }
+            };
+
+            const upHandler = (upEvt) => {
+                window.removeEventListener('mousemove', moveHandler);
+                window.removeEventListener('mouseup', upHandler);
+
+                document.querySelectorAll(`.drop-slot-p${player}`).forEach(s => s.classList.remove('slot-hover-active'));
+                if (floatingCard) floatingCard.classList.add('hidden');
+
+                const targetEl = document.elementFromPoint(upEvt.clientX, upEvt.clientY);
+                const slotEl = targetEl ? targetEl.closest(`.drop-slot-p${player}`) : null;
+                if (slotEl) {
+                    const slotIdx = parseInt(slotEl.dataset.slotIdx);
+                    placeCardInSlotBattle(card, slotIdx, player);
+                }
+
+                if (player === 1) gameState.draggedCardP1 = null;
+                else gameState.draggedCardP2 = null;
+            };
+
+            window.addEventListener('mousemove', moveHandler);
+            window.addEventListener('mouseup', upHandler);
         }
 
         function placeCardInSlotBattle(card, slotIdx, player) {
