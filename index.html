@@ -733,7 +733,8 @@
 
     <!-- ==================== MODAL AKTIVASI SENSOR TANGAN (WEBCAM CALIBRATION) ==================== -->
     <div id="webcam-activation-screen" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent pointer-events-auto">
-        <div class="glass-panel max-w-lg w-full rounded-3xl p-6 border-emerald-500/50 shadow-2xl text-center relative overflow-hidden !bg-slate-900/20 !backdrop-blur-sm">
+        <!-- SOLO ACTIVATION BOX -->
+        <div id="activation-solo-box" class="glass-panel max-w-lg w-full rounded-3xl p-6 border-emerald-500/50 shadow-2xl text-center relative overflow-hidden !bg-slate-900/20 !backdrop-blur-sm">
             <!-- Glowing Accent -->
             <div class="absolute -top-16 -left-16 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl"></div>
             <div class="absolute -bottom-16 -right-16 w-32 h-32 bg-teal-500/20 rounded-full blur-2xl"></div>
@@ -772,6 +773,80 @@
             <div class="flex items-center gap-3 justify-center">
                 <button onclick="finishWebcamActivation()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-fredoka font-bold text-sm shadow-lg transition active:scale-95 flex items-center gap-2">
                     <i class="fa-solid fa-circle-check"></i> Siap, Masuk Permainan!
+                </button>
+            </div>
+        </div>
+
+        <!-- BATTLE ACTIVATION BOX (2 PLAYERS SIDE BY SIDE) -->
+        <div id="activation-battle-box" class="hidden max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- PEMAIN 1 (KIRI) -->
+            <div class="glass-panel rounded-3xl p-5 border-2 border-emerald-500/60 shadow-2xl text-center relative overflow-hidden !bg-slate-900/30 !backdrop-blur-sm flex flex-col justify-between">
+                <div>
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-emerald-200 text-xs font-bold mb-2">
+                        <i class="fa-solid fa-user"></i> PEMAIN 1 (KIRI)
+                    </div>
+                    <h4 class="font-fredoka text-xl text-emerald-400 font-bold mb-1">Aktivasi Sensor P1</h4>
+                    <p class="text-[11px] text-slate-100 mb-3 font-medium">Lakukan gestur kepal di area KIRI</p>
+
+                    <div id="p1-activation-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/70 border border-amber-500/50 text-amber-300 text-[11px] font-bold mb-3 backdrop-blur-md">
+                        <span id="p1-activation-ping-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                        <span id="p1-activation-status-text">Mencari Tangan P1...</span>
+                    </div>
+
+                    <div id="p1-activation-target-zone" class="relative w-32 h-32 sm:w-36 sm:h-36 mx-auto rounded-2xl border-4 border-dashed border-emerald-400/80 bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-2 transition-all duration-300 shadow-lg my-1">
+                        <div id="p1-activation-target-icon" class="text-3xl sm:text-4xl mb-1 text-emerald-400 transition-transform duration-300">
+                            <i class="fa-solid fa-hand-back-fist"></i>
+                        </div>
+                        <span id="p1-activation-target-label" class="font-fredoka text-xs font-bold text-white text-center leading-snug">
+                            Kepalkan Tangan (FIST ✊)
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <div class="w-full bg-slate-900/70 backdrop-blur-md rounded-full h-2.5 border border-slate-600/80 overflow-hidden mb-1">
+                        <div id="p1-activation-progress-bar" class="bg-gradient-to-r from-emerald-500 to-teal-300 h-full w-0 transition-all duration-150"></div>
+                    </div>
+                    <span id="p1-activation-progress-text" class="text-[10px] font-bold text-emerald-300 block mb-2">Progres P1: 0%</span>
+                </div>
+            </div>
+
+            <!-- PEMAIN 2 (KANAN) -->
+            <div class="glass-panel rounded-3xl p-5 border-2 border-cyan-500/60 shadow-2xl text-center relative overflow-hidden !bg-slate-900/30 !backdrop-blur-sm flex flex-col justify-between">
+                <div>
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 text-xs font-bold mb-2">
+                        <i class="fa-solid fa-user-ninja"></i> PEMAIN 2 (KANAN)
+                    </div>
+                    <h4 class="font-fredoka text-xl text-cyan-400 font-bold mb-1">Aktivasi Sensor P2</h4>
+                    <p class="text-[11px] text-slate-100 mb-3 font-medium">Lakukan gestur kepal di area KANAN</p>
+
+                    <div id="p2-activation-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/70 border border-amber-500/50 text-amber-300 text-[11px] font-bold mb-3 backdrop-blur-md">
+                        <span id="p2-activation-ping-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                        <span id="p2-activation-status-text">Mencari Tangan P2...</span>
+                    </div>
+
+                    <div id="p2-activation-target-zone" class="relative w-32 h-32 sm:w-36 sm:h-36 mx-auto rounded-2xl border-4 border-dashed border-cyan-400/80 bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-2 transition-all duration-300 shadow-lg my-1">
+                        <div id="p2-activation-target-icon" class="text-3xl sm:text-4xl mb-1 text-cyan-400 transition-transform duration-300">
+                            <i class="fa-solid fa-hand-back-fist"></i>
+                        </div>
+                        <span id="p2-activation-target-label" class="font-fredoka text-xs font-bold text-white text-center leading-snug">
+                            Kepalkan Tangan (FIST ✊)
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <div class="w-full bg-slate-900/70 backdrop-blur-md rounded-full h-2.5 border border-slate-600/80 overflow-hidden mb-1">
+                        <div id="p2-activation-progress-bar" class="bg-gradient-to-r from-cyan-500 to-teal-300 h-full w-0 transition-all duration-150"></div>
+                    </div>
+                    <span id="p2-activation-progress-text" class="text-[10px] font-bold text-cyan-300 block mb-2">Progres P2: 0%</span>
+                </div>
+            </div>
+
+            <!-- ACTION FULL WIDTH BUTTON IN BATTLE ACTIVATION -->
+            <div class="col-span-1 md:col-span-2 flex justify-center mt-2">
+                <button onclick="finishWebcamActivation()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-fredoka font-bold text-sm shadow-xl transition active:scale-95 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-check"></i> Siap, Masuk Permainan Battle!
                 </button>
             </div>
         </div>
@@ -944,6 +1019,8 @@
             webcamActive: false,
             webcamActivationActive: false,
             activationProgress: 0,
+            activationProgressP1: 0,
+            activationProgressP2: 0,
             isPinched: false,
             pinchPos: { x: 0, y: 0 },
             draggedCard: null,
@@ -1136,11 +1213,25 @@
         function showWebcamActivationScreen() {
             gameState.webcamActivationActive = true;
             gameState.activationProgress = 0;
+            gameState.activationProgressP1 = 0;
+            gameState.activationProgressP2 = 0;
 
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('webcam-activation-screen').classList.remove('hidden');
             
-            updateActivationProgressUI(0);
+            const soloBox = document.getElementById('activation-solo-box');
+            const battleBox = document.getElementById('activation-battle-box');
+
+            if (gameState.mode === 'battle') {
+                if (soloBox) soloBox.classList.add('hidden');
+                if (battleBox) battleBox.classList.remove('hidden');
+                updateActivationProgressUIBattle(1, 0);
+                updateActivationProgressUIBattle(2, 0);
+            } else {
+                if (soloBox) soloBox.classList.remove('hidden');
+                if (battleBox) battleBox.classList.add('hidden');
+                updateActivationProgressUI(0);
+            }
 
             if (!gameState.webcamActive) {
                 toggleWebcam();
@@ -1165,6 +1256,13 @@
             const progressText = document.getElementById('activation-progress-text');
             if (progressBar) progressBar.style.width = `${progress}%`;
             if (progressText) progressText.innerText = `Progres Aktivasi: ${Math.round(progress)}%`;
+        }
+
+        function updateActivationProgressUIBattle(player, progress) {
+            const progressBar = document.getElementById(`p${player}-activation-progress-bar`);
+            const progressText = document.getElementById(`p${player}-activation-progress-text`);
+            if (progressBar) progressBar.style.width = `${progress}%`;
+            if (progressText) progressText.innerText = `Progres P${player}: ${Math.round(progress)}%`;
         }
 
         function addScore(points, player = 1) {
@@ -2810,6 +2908,61 @@
 
             // INTERAKSI HALAMAN AKTIVASI SENSOR WEBCAM (FIST GESTURE)
             if (gameState.webcamActivationActive) {
+                if (gameState.mode === 'battle') {
+                    const badge = document.getElementById(`p${playerHand}-activation-status-badge`);
+                    const badgeText = document.getElementById(`p${playerHand}-activation-status-text`);
+                    const pingDot = document.getElementById(`p${playerHand}-activation-ping-dot`);
+                    const targetZone = document.getElementById(`p${playerHand}-activation-target-zone`);
+                    const targetIcon = document.getElementById(`p${playerHand}-activation-target-icon`);
+
+                    const bgBadgeClass = playerHand === 1 ? 'bg-emerald-950/80 border-emerald-400 text-emerald-300' : 'bg-cyan-950/80 border-cyan-400 text-cyan-300';
+
+                    if (badgeText) {
+                        badgeText.innerText = `P${playerHand} Terdeteksi! Kepalkan Tangan (FIST ✊)`;
+                        if (badge) badge.className = `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold mb-3 backdrop-blur-md ${bgBadgeClass}`;
+                        if (pingDot) pingDot.className = "w-2 h-2 rounded-full bg-teal-400 animate-ping";
+                    }
+
+                    if (isFistNow) {
+                        if (playerHand === 1) {
+                            gameState.activationProgressP1 = Math.min(100, gameState.activationProgressP1 + 2.5);
+                            updateActivationProgressUIBattle(1, gameState.activationProgressP1);
+                        } else {
+                            gameState.activationProgressP2 = Math.min(100, gameState.activationProgressP2 + 2.5);
+                            updateActivationProgressUIBattle(2, gameState.activationProgressP2);
+                        }
+
+                        if (targetZone) {
+                            targetZone.classList.add('scale-110', 'border-amber-400', 'bg-amber-950/60', 'shadow-amber-500/50');
+                        }
+                        if (targetIcon) {
+                            targetIcon.className = "text-3xl sm:text-4xl mb-1 text-amber-400 scale-125 transition-transform duration-150";
+                        }
+
+                        if (gameState.activationProgressP1 >= 100 && gameState.activationProgressP2 >= 100) {
+                            finishWebcamActivation();
+                        }
+                    } else {
+                        if (playerHand === 1) {
+                            gameState.activationProgressP1 = Math.max(0, gameState.activationProgressP1 - 1);
+                            updateActivationProgressUIBattle(1, gameState.activationProgressP1);
+                        } else {
+                            gameState.activationProgressP2 = Math.max(0, gameState.activationProgressP2 - 1);
+                            updateActivationProgressUIBattle(2, gameState.activationProgressP2);
+                        }
+
+                        if (targetZone) {
+                            targetZone.classList.remove('scale-110', 'border-amber-400', 'bg-amber-950/60', 'shadow-amber-500/50');
+                        }
+                        if (targetIcon) {
+                            const iconColor = playerHand === 1 ? 'text-emerald-400' : 'text-cyan-400';
+                            targetIcon.className = `text-3xl sm:text-4xl mb-1 ${iconColor} transition-transform duration-150`;
+                        }
+                    }
+                    return;
+                }
+
+                // Mode Solo
                 const badge = document.getElementById('activation-status-badge');
                 const badgeText = document.getElementById('activation-status-text');
                 const pingDot = document.getElementById('activation-ping-dot');
