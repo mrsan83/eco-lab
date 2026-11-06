@@ -395,7 +395,7 @@
                     <span id="instruction-text" class="font-medium text-xs sm:text-sm">Seret kartu makhluk hidup di bawah ke slot urutan yang tepat!</span>
                 </div>
                 <div class="hidden sm:flex items-center gap-2 text-xs bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-700 text-amber-300">
-                    <i class="fa-solid fa-hand-back-fist"></i> PINCH = Ambil | <i class="fa-solid fa-hand"></i> LEPAS = Letakkan
+                    <i class="fa-solid fa-hand-back-fist"></i> FIST (Kepal) = Ambil | <i class="fa-solid fa-hand"></i> OPEN PALM (Buka) = Letakkan
                 </div>
             </div>
 
@@ -627,7 +627,7 @@
                             <ul class="space-y-1.5 text-xs">
                                 <li><strong class="text-emerald-400">Mode Solo:</strong> Selesaikan tantangan rantai & jaring-jaring secara mandiri untuk mengumpulkan skor tertinggi.</li>
                                 <li><strong class="text-amber-400">Mode Battle (2 Players):</strong> Tanding 2 pemain secara berdampingan (Kiri vs Kanan). ⚡ <em>Pemain yang selesai lebih dahulu mendapat tambahan poin kecepatan & langsung melanjutkan ke level berikutnya!</em></li>
-                                <li><strong class="text-emerald-400">Mode WebCam:</strong> Dekatkan jempol & telunjuk (<span class="text-amber-300 font-semibold">PINCH</span>) untuk mengambil kartu / menarik garis energi. Buka telapak tangan untuk melepas.</li>
+                                <li><strong class="text-emerald-400">Mode WebCam:</strong> Kepalkan tangan (<span class="text-amber-300 font-semibold font-fredoka">FIST ✊</span>) untuk menggenggam/mengambil kartu & menarik garis. Buka telapak tangan (<span class="text-emerald-400 font-semibold font-fredoka">OPEN PALM ✋</span>) untuk melepaskan kartu ke slot.</li>
                                 <li><strong class="text-emerald-400">Mode Sentuh / Mouse:</strong> Klik & seret (drag & drop) kartu atau tarik garis dari satu node ke node lain secara langsung.</li>
                             </ul>
                         </div>
@@ -757,9 +757,9 @@
                     <i class="fa-solid fa-hand-back-fist"></i>
                 </div>
                 <span id="activation-target-label" class="font-fredoka text-xs sm:text-sm font-bold text-white text-center leading-snug drop-shadow">
-                    Tempelkan Jempol & Telunjuk (PINCH)
+                    Kepalkan Tangan Anda (FIST ✊)
                 </span>
-                <span class="text-[10px] text-slate-300 mt-1 font-semibold">Genggam target ini</span>
+                <span class="text-[10px] text-slate-300 mt-1 font-semibold">Mengepal untuk menggenggam target</span>
             </div>
 
             <!-- Progress Meter -->
@@ -2358,6 +2358,39 @@
         let webcamStream = null;
         let animationFrameId = null;
 
+        // Fungsi Deteksi Gestur FIST (Mengepal ✊) vs OPEN PALM (Buka ✋)
+        function isFistGesture(landmarks) {
+            const wrist = landmarks[0];
+            const fingerTips = [8, 12, 16, 20];
+            const fingerPips = [6, 10, 14, 18];
+            const fingerMcps = [5, 9, 13, 17];
+
+            let curledCount = 0;
+            for (let i = 0; i < 4; i++) {
+                const tip = landmarks[fingerTips[i]];
+                const pip = landmarks[fingerPips[i]];
+
+                const dTipWrist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+                const dPipWrist = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+
+                // Jika ujung jari melipat lebih dekat ke pergelangan dibanding sendi PIP
+                if (dTipWrist < dPipWrist * 1.05) {
+                    curledCount++;
+                }
+            }
+            
+            // Periksa juga posisi jempol melipat
+            const thumbTip = landmarks[4];
+            const middleMcp = landmarks[9];
+            const dThumb = Math.hypot(thumbTip.x - middleMcp.x, thumbTip.y - middleMcp.y);
+            if (dThumb < 0.18) {
+                curledCount++;
+            }
+
+            // Minimal 3 jari melipat = FIST (Mengepal)
+            return curledCount >= 3;
+        }
+
         async function toggleWebcam() {
             initAudio();
             const videoEl = document.getElementById('webcam-video');
@@ -2479,11 +2512,9 @@
 
                             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                                 results.multiHandLandmarks.forEach((landmarks, handIndex) => {
-                                    const thumb = landmarks[4];
-                                    const index = landmarks[8];
-
-                                    const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-                                    const isPinchNow = pinchDist < 0.07;
+                                    // Menggunakan landmark pusat ruas buku jari (Middle MCP #9) sebagai jangkar koordinat yang stabil
+                                    const handCenterNode = landmarks[9];
+                                    const isFistNow = isFistGesture(landmarks);
 
                                     const screenW = window.innerWidth;
                                     const screenH = window.innerHeight;
@@ -2507,8 +2538,8 @@
                                         offsetX = (scaledW - screenW) / 2;
                                     }
 
-                                    const vx = index.x * scaledW - offsetX;
-                                    const vy = index.y * scaledH - offsetY;
+                                    const vx = handCenterNode.x * scaledW - offsetX;
+                                    const vy = handCenterNode.y * scaledH - offsetY;
 
                                     const drawX = vx;
                                     const drawY = vy;
@@ -2522,22 +2553,28 @@
                                         playerHand = (screenX < screenW / 2) ? 1 : 2;
                                     }
 
+                                    // Visual Hand Pointer: Lingkaran + Icon FIST (✊) / OPEN PALM (✋)
                                     ctx.beginPath();
-                                    ctx.arc(drawX, drawY, isPinchNow ? 18 : 12, 0, 2 * Math.PI);
-                                    ctx.fillStyle = (playerHand === 2) ? (isPinchNow ? '#06B6D4' : '#F59E0B') : (isPinchNow ? '#10B981' : '#F59E0B');
+                                    ctx.arc(drawX, drawY, isFistNow ? 22 : 14, 0, 2 * Math.PI);
+                                    ctx.fillStyle = isFistNow ? (playerHand === 2 ? '#06B6D4' : '#10B981') : 'rgba(245, 158, 11, 0.35)';
                                     ctx.fill();
                                     ctx.lineWidth = 3;
-                                    ctx.strokeStyle = '#FFFFFF';
+                                    ctx.strokeStyle = isFistNow ? '#FFFFFF' : '#F59E0B';
                                     ctx.stroke();
 
-                                    // Indikator Tangan P1 / P2 pada Canvas Video
+                                    // Simbol status gestur pada titik kursor tangan
+                                    ctx.font = 'bold 13px Fredoka, sans-serif';
+                                    ctx.fillStyle = '#FFFFFF';
+                                    ctx.fillText(isFistNow ? '✊' : '✋', drawX - 7, drawY + 5);
+
+                                    // Label P1 / P2 di Mode Battle
                                     if (gameState.mode === 'battle') {
                                         ctx.font = 'bold 12px Fredoka, sans-serif';
                                         ctx.fillStyle = '#FFFFFF';
-                                        ctx.fillText(`P${playerHand}`, drawX - 8, drawY - 20);
+                                        ctx.fillText(`P${playerHand}`, drawX - 8, drawY - 24);
                                     }
 
-                                    handleVirtualHandInteraction(screenX, screenY, isPinchNow, playerHand);
+                                    handleVirtualHandInteraction(screenX, screenY, isFistNow, playerHand);
                                 });
                             } else {
                                 const floatingCard = document.getElementById('webcam-floating-card');
@@ -2569,13 +2606,12 @@
             };
             processFrame();
         }
-
-        function handleVirtualHandInteraction(x, y, isPinched, playerHand = 1) {
+        function handleVirtualHandInteraction(x, y, isFistNow, playerHand = 1) {
             const targetEl = document.elementFromPoint(x, y);
             const floatingCardId = gameState.mode === 'battle' ? `webcam-floating-card-p${playerHand}` : 'webcam-floating-card';
             const floatingCard = document.getElementById(floatingCardId);
 
-            // INTERAKSI HALAMAN AKTIVASI SENSOR WEBCAM
+            // INTERAKSI HALAMAN AKTIVASI SENSOR WEBCAM (FIST GESTURE)
             if (gameState.webcamActivationActive) {
                 const badge = document.getElementById('activation-status-badge');
                 const badgeText = document.getElementById('activation-status-text');
@@ -2584,12 +2620,12 @@
                 const targetIcon = document.getElementById('activation-target-icon');
 
                 if (badgeText) {
-                    badgeText.innerText = "Tangan Terdeteksi! Tempelkan Jempol & Telunjuk";
+                    badgeText.innerText = "Tangan Terdeteksi! Kepalkan Tangan (FIST ✊) untuk Menggenggam";
                     if (badge) badge.className = "inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-950 border border-teal-400 text-teal-300 text-xs font-bold mb-5 transition-all duration-300";
                     if (pingDot) pingDot.className = "w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping";
                 }
 
-                if (isPinched) {
+                if (isFistNow) {
                     gameState.activationProgress = Math.min(100, gameState.activationProgress + 2.5);
                     updateActivationProgressUI(gameState.activationProgress);
 
@@ -2617,7 +2653,7 @@
                 return;
             }
 
-            // Interaksi Level 1-3 (Drag & Drop Kartu)
+            // Interaksi Level 1-3 (FIST = Ambil/Genggam Kartu, OPEN PALM = Melepas)
             if (gameState.currentLevel <= 3) {
                 const cardSelector = gameState.mode === 'battle' ? `.card-item-p${playerHand}` : '.card-item';
                 const slotSelector = gameState.mode === 'battle' ? `.drop-slot-p${playerHand}` : '.drop-slot';
@@ -2632,7 +2668,7 @@
                 // Reset indikator animasi pada slot pemain terkait
                 document.querySelectorAll(slotSelector).forEach(s => s.classList.remove('slot-hover-active'));
 
-                if (isPinched) {
+                if (isFistNow) {
                     if (cardEl && !activeDraggedCard) {
                         const cardId = cardEl.dataset.cardId;
                         const cardObj = LEVEL_DATA[gameState.currentLevel].cards.find(c => c.id === cardId);
@@ -2647,7 +2683,7 @@
                         }
                     }
 
-                    // Tampilkan & geser kartu mengikuti pergerakan kursor tangan di Mode WebCam
+                    // Tampilkan & geser kartu mengikuti pergerakan mengepal tangan di Mode WebCam
                     const cardToRender = gameState.mode === 'battle' 
                         ? (playerHand === 1 ? gameState.draggedCardP1 : gameState.draggedCardP2)
                         : gameState.draggedCard;
@@ -2656,11 +2692,11 @@
                         const colorBg = playerHand === 2 ? 'from-cyan-600 via-teal-700' : 'from-emerald-600 via-teal-700';
                         const colorBorder = playerHand === 2 ? 'border-cyan-400' : 'border-amber-400';
                         floatingCard.innerHTML = `
-                            <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b ${colorBg} to-slate-900 border-2 ${colorBorder} rounded-2xl flex flex-col items-center justify-center p-1 text-center shadow-2xl scale-110 -rotate-3 animate-pulse">
+                            <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b ${colorBg} to-slate-900 border-2 ${colorBorder} rounded-2xl flex flex-col items-center justify-center p-1 text-center shadow-2xl scale-110 -rotate-3">
                                 <span class="text-2xl sm:text-3xl mb-0.5 filter drop-shadow-md">${cardToRender.emoji}</span>
                                 <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${cardToRender.name}</span>
-                                <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60">
-                                    P${playerHand} TERAMBIL
+                                <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60 flex items-center gap-1 justify-center">
+                                    ✊ P${playerHand} DIGENGGAM
                                 </span>
                             </div>
                         `;
@@ -2673,6 +2709,7 @@
                         }
                     }
                 } else {
+                    // TELAPAK TANGAN TERBUKA (OPEN PALM ✋): Lepas Kartu ke Slot Target
                     if (activeDraggedCard) {
                         if (slotEl) {
                             const slotIdx = parseInt(slotEl.dataset.slotIdx);
@@ -2694,7 +2731,7 @@
                     }
                 }
             } 
-            // Interaksi Level 4 (Tarik Garis Jaring Makanan)
+            // Interaksi Level 4 (FIST = Tarik Garis Energi, OPEN PALM = Tautkan Garis)
             else if (gameState.currentLevel === 4) {
                 if (floatingCard) floatingCard.classList.add('hidden');
                 const nodeSelector = gameState.mode === 'battle' ? `#nodes-p${playerHand} .organism-node` : '.organism-node';
@@ -2704,7 +2741,7 @@
                     ? (playerHand === 1 ? gameState.activeDragNodeP1 : gameState.activeDragNodeP2)
                     : gameState.activeDragNode;
 
-                if (isPinched && nodeEl && !activeDrag) {
+                if (isFistNow && nodeEl && !activeDrag) {
                     const nodeId = nodeEl.dataset.nodeId || nodeEl.id.replace('node-solo-', '').replace('node-p1-', '').replace('node-p2-', '');
                     if (gameState.mode === 'battle') {
                         startDragLineBattle(nodeId, playerHand, { clientX: x, clientY: y });
@@ -2718,7 +2755,7 @@
                         updateActiveDragLine({ clientX: x, clientY: y });
                     }
                     
-                    if (!isPinched && nodeEl) {
+                    if (!isFistNow && nodeEl) {
                         const targetId = nodeEl.dataset.nodeId || nodeEl.id.replace('node-solo-', '').replace('node-p1-', '').replace('node-p2-', '');
                         if (gameState.mode === 'battle') {
                             endDragLineBattle(targetId, playerHand, { clientX: x, clientY: y });
