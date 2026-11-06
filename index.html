@@ -242,6 +242,8 @@
 
     <!-- ELEMEN KARTU MELAYANG WEBCAM (GESTURE DRAG PROXY) -->
     <div id="webcam-floating-card" class="fixed hidden pointer-events-none z-50 -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out"></div>
+    <div id="webcam-floating-card-p1" class="fixed hidden pointer-events-none z-50 -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out"></div>
+    <div id="webcam-floating-card-p2" class="fixed hidden pointer-events-none z-50 -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out"></div>
 
     <!-- ==================== SPLASH SCREEN (Halaman Pembuka) ==================== -->
     <div id="splash-screen" class="relative z-20 flex flex-col justify-between min-h-screen p-4 sm:p-8 max-w-5xl mx-auto w-full">
@@ -945,6 +947,8 @@
             isPinched: false,
             pinchPos: { x: 0, y: 0 },
             draggedCard: null,
+            draggedCardP1: null,
+            draggedCardP2: null,
             
             // Level 4 Network Connection State
             l4Nodes: [],
@@ -952,6 +956,8 @@
             p1L4Connections: [], // Battle P1
             p2L4Connections: [], // Battle P2
             activeDragNode: null,
+            activeDragNodeP1: null,
+            activeDragNodeP2: null,
             activeDragPlayer: 1,
             belalangExtinct: false,
             p1Complete: false,
@@ -1587,6 +1593,10 @@
             if (gameState.activeDragNode && gameState.currentLevel === 4) {
                 updateActiveDragLine(e);
             }
+            if (gameState.mode === 'battle' && gameState.currentLevel === 4) {
+                if (gameState.activeDragNodeP1) updateActiveDragLineBattle(1, e);
+                if (gameState.activeDragNodeP2) updateActiveDragLineBattle(2, e);
+            }
         });
         window.addEventListener('mouseup', () => {
             if (gameState.activeDragNode && gameState.currentLevel === 4) {
@@ -1594,7 +1604,34 @@
                 const activeLine = document.getElementById('svg-active-drag-line');
                 if (activeLine) activeLine.classList.add('hidden');
             }
+            if (gameState.mode === 'battle' && gameState.currentLevel === 4) {
+                if (gameState.activeDragNodeP1) {
+                    gameState.activeDragNodeP1 = null;
+                    const line1 = document.getElementById('svg-p1-active-line');
+                    if (line1) line1.classList.add('hidden');
+                }
+                if (gameState.activeDragNodeP2) {
+                    gameState.activeDragNodeP2 = null;
+                    const line2 = document.getElementById('svg-p2-active-line');
+                    if (line2) line2.classList.add('hidden');
+                }
+            }
         });
+
+        // Global Multi-Touch Listener for Level 4 Network Lines in Battle Mode
+        window.addEventListener('touchmove', (e) => {
+            if (gameState.mode === 'battle' && gameState.currentLevel === 4) {
+                for (let i = 0; i < e.touches.length; i++) {
+                    const t = e.touches[i];
+                    const player = (t.clientX < window.innerWidth / 2) ? 1 : 2;
+                    if (player === 1 && gameState.activeDragNodeP1) {
+                        updateActiveDragLineBattle(1, t);
+                    } else if (player === 2 && gameState.activeDragNodeP2) {
+                        updateActiveDragLineBattle(2, t);
+                    }
+                }
+            }
+        }, { passive: false });
 
         /* ==================== SPLIT SCREEN BATTLE BOARD RENDERER ==================== */
         let p1SlotsState = [];
@@ -1646,7 +1683,8 @@
                 slotEl.addEventListener('dragover', (e) => e.preventDefault());
                 slotEl.addEventListener('drop', (e) => {
                     e.preventDefault();
-                    if (gameState.draggedCard) placeCardInSlotBattle(gameState.draggedCard, i, player);
+                    const card = player === 1 ? gameState.draggedCardP1 : gameState.draggedCardP2;
+                    if (card) placeCardInSlotBattle(card, i, player);
                 });
                 slotsContainer.appendChild(slotEl);
 
@@ -1660,7 +1698,7 @@
                 }
             }
 
-            // Cards Deck
+            // Cards Deck with Multi-Touch Support
             const shuffled = [...data.cards].sort(() => Math.random() - 0.5);
             shuffled.forEach(card => {
                 const cardEl = document.createElement('div');
@@ -1674,12 +1712,109 @@
                 `;
 
                 cardEl.addEventListener('dragstart', (e) => {
-                    gameState.draggedCard = card;
+                    if (player === 1) gameState.draggedCardP1 = card;
+                    else gameState.draggedCardP2 = card;
                     e.dataTransfer.setData('text/plain', card.id);
+                });
+
+                // Multi-touch Handler for 2 Players Touching Simultaneously
+                cardEl.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    startTouchDragCard(card, player, touch);
+                }, { passive: false });
+
+                cardEl.addEventListener('click', () => {
+                    const slotsState = (player === 1) ? p1SlotsState : p2SlotsState;
+                    const emptyIdx = slotsState.findIndex(s => s === null);
+                    if (emptyIdx !== -1) {
+                        placeCardInSlotBattle(card, emptyIdx, player);
+                    }
                 });
 
                 deckContainer.appendChild(cardEl);
             });
+        }
+
+        /* Custom Touch Drag Engine for Multi-Touch 2 Players */
+        function startTouchDragCard(card, player, touch) {
+            if (player === 1) gameState.draggedCardP1 = card;
+            else gameState.draggedCardP2 = card;
+            
+            playSound('pop');
+
+            const floatingCard = document.getElementById(`webcam-floating-card-p${player}`);
+            if (floatingCard) {
+                const colorBorder = player === 1 ? 'border-emerald-400' : 'border-cyan-400';
+                const colorBg = player === 1 ? 'from-emerald-600 via-teal-700' : 'from-cyan-600 via-teal-700';
+                floatingCard.innerHTML = `
+                    <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b ${colorBg} to-slate-900 border-2 ${colorBorder} rounded-xl flex flex-col items-center justify-center p-1 text-center shadow-2xl scale-110 -rotate-3">
+                        <span class="text-2xl sm:text-3xl mb-0.5 filter drop-shadow-md">${card.emoji}</span>
+                        <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${card.name}</span>
+                        <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60">
+                            P${player} TERAMBIL
+                        </span>
+                    </div>
+                `;
+                floatingCard.style.left = `${touch.clientX}px`;
+                floatingCard.style.top = `${touch.clientY}px`;
+                floatingCard.classList.remove('hidden');
+            }
+
+            const moveHandler = (moveEvt) => {
+                let currentTouch = null;
+                for (let i = 0; i < moveEvt.touches.length; i++) {
+                    if (moveEvt.touches[i].identifier === touch.identifier) {
+                        currentTouch = moveEvt.touches[i];
+                        break;
+                    }
+                }
+                if (!currentTouch) currentTouch = moveEvt.touches[0];
+
+                if (floatingCard && currentTouch) {
+                    floatingCard.style.left = `${currentTouch.clientX}px`;
+                    floatingCard.style.top = `${currentTouch.clientY}px`;
+
+                    const targetEl = document.elementFromPoint(currentTouch.clientX, currentTouch.clientY);
+                    const slotEl = targetEl ? targetEl.closest(`.drop-slot-p${player}`) : null;
+                    document.querySelectorAll(`.drop-slot-p${player}`).forEach(s => s.classList.remove('slot-hover-active'));
+                    if (slotEl) slotEl.classList.add('slot-hover-active');
+                }
+            };
+
+            const endHandler = (endEvt) => {
+                let endTouch = null;
+                for (let i = 0; i < endEvt.changedTouches.length; i++) {
+                    if (endEvt.changedTouches[i].identifier === touch.identifier) {
+                        endTouch = endEvt.changedTouches[i];
+                        break;
+                    }
+                }
+                if (!endTouch) endTouch = endEvt.changedTouches[0];
+
+                window.removeEventListener('touchmove', moveHandler);
+                window.removeEventListener('touchend', endHandler);
+                window.removeEventListener('touchcancel', endHandler);
+
+                document.querySelectorAll(`.drop-slot-p${player}`).forEach(s => s.classList.remove('slot-hover-active'));
+                if (floatingCard) floatingCard.classList.add('hidden');
+
+                if (endTouch) {
+                    const targetEl = document.elementFromPoint(endTouch.clientX, endTouch.clientY);
+                    const slotEl = targetEl ? targetEl.closest(`.drop-slot-p${player}`) : null;
+                    if (slotEl) {
+                        const slotIdx = parseInt(slotEl.dataset.slotIdx);
+                        placeCardInSlotBattle(card, slotIdx, player);
+                    }
+                }
+
+                if (player === 1) gameState.draggedCardP1 = null;
+                else gameState.draggedCardP2 = null;
+            };
+
+            window.addEventListener('touchmove', moveHandler, { passive: false });
+            window.addEventListener('touchend', endHandler, { passive: false });
+            window.addEventListener('touchcancel', endHandler, { passive: false });
         }
 
         function placeCardInSlotBattle(card, slotIdx, player) {
@@ -1713,7 +1848,7 @@
                     if (player === 1) gameState.p1Complete = true;
                     if (player === 2) gameState.p2Complete = true;
 
-                    // Aturan Baru: Pemain pertama selesai dapat bonus poin & langsung membawa permainan ke level berikutnya
+                    // Pemain pertama selesai dapat bonus poin & membawa permainan ke level berikutnya
                     if (!gameState.firstFinisher) {
                         gameState.firstFinisher = player;
                         const speedBonus = 30;
@@ -1750,6 +1885,7 @@
             data.nodes.forEach(node => {
                 const nodeEl = document.createElement('div');
                 nodeEl.id = `node-p${player}-${node.id}`;
+                nodeEl.dataset.nodeId = node.id;
                 nodeEl.className = `organism-node absolute w-10 h-10 sm:w-14 sm:h-14 rounded-xl glass-light border-2 ${player === 1 ? 'border-emerald-500' : 'border-cyan-500'} flex flex-col items-center justify-center text-center shadow cursor-pointer z-20`;
                 nodeEl.style.left = `${node.x}%`;
                 nodeEl.style.top = `${node.y}%`;
@@ -1763,24 +1899,76 @@
                 nodeEl.addEventListener('mousedown', (e) => startDragLineBattle(node.id, player, e));
                 nodeEl.addEventListener('mouseup', (e) => endDragLineBattle(node.id, player, e));
 
+                // Multi-touch for Level 4 Node Connection Line
+                nodeEl.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    startDragLineBattle(node.id, player, { clientX: touch.clientX, clientY: touch.clientY });
+                }, { passive: false });
+
+                nodeEl.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const targetNode = targetEl ? targetEl.closest('.organism-node') : null;
+                    if (targetNode) {
+                        const targetId = targetNode.dataset.nodeId || targetNode.id.replace(`node-p${player}-`, '');
+                        endDragLineBattle(targetId, player, { clientX: touch.clientX, clientY: touch.clientY });
+                    } else {
+                        if (player === 1) gameState.activeDragNodeP1 = null;
+                        else gameState.activeDragNodeP2 = null;
+                        const activeLine = document.getElementById(`svg-p${player}-active-line`);
+                        if (activeLine) activeLine.classList.add('hidden');
+                    }
+                }, { passive: false });
+
                 container.appendChild(nodeEl);
             });
         }
 
         function startDragLineBattle(nodeId, player, e) {
-            gameState.activeDragNode = nodeId;
-            gameState.activeDragPlayer = player;
+            if (player === 1) gameState.activeDragNodeP1 = nodeId;
+            else gameState.activeDragNodeP2 = nodeId;
+
             const activeLine = document.getElementById(`svg-p${player}-active-line`);
-            activeLine.classList.remove('hidden');
+            if (activeLine) {
+                activeLine.classList.remove('hidden');
+                updateActiveDragLineBattle(player, e);
+            }
+        }
+
+        function updateActiveDragLineBattle(player, e) {
+            const activeNodeId = (player === 1) ? gameState.activeDragNodeP1 : gameState.activeDragNodeP2;
+            if (!activeNodeId) return;
+            const pNet = document.getElementById(`p${player}-net-area`);
+            if (!pNet) return;
+            const rect = pNet.getBoundingClientRect();
+            const sourceNode = LEVEL_DATA[4].nodes.find(n => n.id === activeNodeId);
+            if (!sourceNode) return;
+
+            const x1 = (sourceNode.x / 100) * rect.width;
+            const y1 = (sourceNode.y / 100) * rect.height;
+            const x2 = (e.clientX || e.pageX) - rect.left;
+            const y2 = (e.clientY || e.pageY) - rect.top;
+
+            const activeLine = document.getElementById(`svg-p${player}-active-line`);
+            if (activeLine) {
+                activeLine.setAttribute('x1', x1);
+                activeLine.setAttribute('y1', y1);
+                activeLine.setAttribute('x2', x2);
+                activeLine.setAttribute('y2', y2);
+            }
         }
 
         function endDragLineBattle(targetNodeId, player, e) {
-            if (!gameState.activeDragNode || gameState.activeDragPlayer !== player) return;
-            const sourceId = gameState.activeDragNode;
-            gameState.activeDragNode = null;
-            document.getElementById(`svg-p${player}-active-line`).classList.add('hidden');
+            const sourceId = (player === 1) ? gameState.activeDragNodeP1 : gameState.activeDragNodeP2;
+            if (player === 1) gameState.activeDragNodeP1 = null;
+            else gameState.activeDragNodeP2 = null;
 
-            if (sourceId === targetNodeId) return;
+            const activeLine = document.getElementById(`svg-p${player}-active-line`);
+            if (activeLine) activeLine.classList.add('hidden');
+
+            if (!sourceId || sourceId === targetNodeId) return;
 
             attemptConnectionBattle(sourceId, targetNodeId, player);
         }
@@ -2271,11 +2459,7 @@
                 }
             });
 
-            // Sembunyikan wallpaper dekoratif HANYA setelah tayangan kamera aktif
-            if (bgWallpaper) bgWallpaper.classList.add('hidden');
-            if (bgPattern) bgPattern.classList.add('hidden');
-
-            // Inisialisasi MediaPipe Hands
+            // Inisialisasi MediaPipe Hands (Tracking 2 Tangan untuk Mode Battle)
             if (typeof Hands !== 'undefined') {
                 try {
                     if (!handsModel) {
@@ -2284,7 +2468,7 @@
                         });
 
                         handsModel.setOptions({
-                            maxNumHands: 1,
+                            maxNumHands: 2, // Mengizinkan pelacakan 2 tangan sekaligus di Mode Battle
                             modelComplexity: 0,
                             minDetectionConfidence: 0.5,
                             minTrackingConfidence: 0.5
@@ -2294,66 +2478,74 @@
                             ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
 
                             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                                const landmarks = results.multiHandLandmarks[0];
-                                const thumb = landmarks[4];
-                                const index = landmarks[8];
+                                results.multiHandLandmarks.forEach((landmarks, handIndex) => {
+                                    const thumb = landmarks[4];
+                                    const index = landmarks[8];
 
-                                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-                                const isPinchNow = pinchDist < 0.07;
+                                    const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+                                    const isPinchNow = pinchDist < 0.07;
 
-                                // Perhitungan presisi kordinat dengan menyesuaikan Object-Cover & CSS Mirroring
-                                const screenW = window.innerWidth;
-                                const screenH = window.innerHeight;
-                                const vWidth = videoEl.videoWidth || 640;
-                                const vHeight = videoEl.videoHeight || 480;
+                                    const screenW = window.innerWidth;
+                                    const screenH = window.innerHeight;
+                                    const vWidth = videoEl.videoWidth || 640;
+                                    const vHeight = videoEl.videoHeight || 480;
 
-                                const screenAspect = screenW / screenH;
-                                const videoAspect = vWidth / vHeight;
+                                    const screenAspect = screenW / screenH;
+                                    const videoAspect = vWidth / vHeight;
 
-                                let scaledW, scaledH, offsetX = 0, offsetY = 0;
+                                    let scaledW, scaledH, offsetX = 0, offsetY = 0;
 
-                                if (screenAspect > videoAspect) {
-                                    // Layar lebih lebar dari video: pemotongan atas-bawah (object-cover)
-                                    const scale = screenW / vWidth;
-                                    scaledW = screenW;
-                                    scaledH = vHeight * scale;
-                                    offsetY = (scaledH - screenH) / 2;
-                                } else {
-                                    // Layar lebih tinggi dari video: pemotongan kiri-kanan (object-cover)
-                                    const scale = screenH / vHeight;
-                                    scaledW = vWidth * scale;
-                                    scaledH = screenH;
-                                    offsetX = (scaledW - screenW) / 2;
-                                }
+                                    if (screenAspect > videoAspect) {
+                                        const scale = screenW / vWidth;
+                                        scaledW = screenW;
+                                        scaledH = vHeight * scale;
+                                        offsetY = (scaledH - screenH) / 2;
+                                    } else {
+                                        const scale = screenH / vHeight;
+                                        scaledW = vWidth * scale;
+                                        scaledH = screenH;
+                                        offsetX = (scaledW - screenW) / 2;
+                                    }
 
-                                // Posisi horizontal & vertikal presisi sesuai skala layar
-                                const vx = index.x * scaledW - offsetX;
-                                const vy = index.y * scaledH - offsetY;
+                                    const vx = index.x * scaledW - offsetX;
+                                    const vy = index.y * scaledH - offsetY;
 
-                                // Menggambar pada canvas internal (akan diputar secara otomatis oleh CSS .mirror)
-                                const drawX = vx;
-                                const drawY = vy;
+                                    const drawX = vx;
+                                    const drawY = vy;
 
-                                // Posisi sebenarnya pada layar UI (CSS Screen Coordinates)
-                                const screenX = screenW - vx;
-                                const screenY = vy;
+                                    const screenX = screenW - vx;
+                                    const screenY = vy;
 
-                                gameState.pinchPos = { x: screenX, y: screenY };
+                                    // Tentukan kepemilikan tangan di Mode Battle (Kiri = Pemain 1, Kanan = Pemain 2)
+                                    let playerHand = 1;
+                                    if (gameState.mode === 'battle') {
+                                        playerHand = (screenX < screenW / 2) ? 1 : 2;
+                                    }
 
-                                ctx.beginPath();
-                                ctx.arc(drawX, drawY, isPinchNow ? 18 : 12, 0, 2 * Math.PI);
-                                ctx.fillStyle = isPinchNow ? '#10B981' : '#F59E0B';
-                                ctx.fill();
-                                ctx.lineWidth = 3;
-                                ctx.strokeStyle = '#FFFFFF';
-                                ctx.stroke();
+                                    ctx.beginPath();
+                                    ctx.arc(drawX, drawY, isPinchNow ? 18 : 12, 0, 2 * Math.PI);
+                                    ctx.fillStyle = (playerHand === 2) ? (isPinchNow ? '#06B6D4' : '#F59E0B') : (isPinchNow ? '#10B981' : '#F59E0B');
+                                    ctx.fill();
+                                    ctx.lineWidth = 3;
+                                    ctx.strokeStyle = '#FFFFFF';
+                                    ctx.stroke();
 
-                                handleVirtualHandInteraction(screenX, screenY, isPinchNow);
-                                gameState.isPinched = isPinchNow;
+                                    // Indikator Tangan P1 / P2 pada Canvas Video
+                                    if (gameState.mode === 'battle') {
+                                        ctx.font = 'bold 12px Fredoka, sans-serif';
+                                        ctx.fillStyle = '#FFFFFF';
+                                        ctx.fillText(`P${playerHand}`, drawX - 8, drawY - 20);
+                                    }
+
+                                    handleVirtualHandInteraction(screenX, screenY, isPinchNow, playerHand);
+                                });
                             } else {
-                                // Sembunyikan kartu melayang jika tangan tidak terdeteksi
                                 const floatingCard = document.getElementById('webcam-floating-card');
+                                const floatingCardP1 = document.getElementById('webcam-floating-card-p1');
+                                const floatingCardP2 = document.getElementById('webcam-floating-card-p2');
                                 if (floatingCard) floatingCard.classList.add('hidden');
+                                if (floatingCardP1) floatingCardP1.classList.add('hidden');
+                                if (floatingCardP2) floatingCardP2.classList.add('hidden');
                             }
                         });
                     }
@@ -2363,25 +2555,25 @@
             }
 
             // Loop Pengiriman Frame Video
-            async function processVideoFrame() {
-                if (!gameState.webcamActive) return;
-
-                if (handsModel && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
-                    try {
-                        await handsModel.send({ image: videoEl });
-                    } catch (e) {
-                        // Abaikan error sementara per frame
+            const processFrame = async () => {
+                if (gameState.webcamActive && videoEl && !videoEl.paused && !videoEl.ended) {
+                    if (handsModel) {
+                        try {
+                            await handsModel.send({ image: videoEl });
+                        } catch (e) {
+                            console.error("Frame send error:", e);
+                        }
                     }
+                    animationFrameId = requestAnimationFrame(processFrame);
                 }
-                animationFrameId = requestAnimationFrame(processVideoFrame);
-            }
-
-            processVideoFrame();
+            };
+            processFrame();
         }
 
-        function handleVirtualHandInteraction(x, y, isPinched) {
+        function handleVirtualHandInteraction(x, y, isPinched, playerHand = 1) {
             const targetEl = document.elementFromPoint(x, y);
-            const floatingCard = document.getElementById('webcam-floating-card');
+            const floatingCardId = gameState.mode === 'battle' ? `webcam-floating-card-p${playerHand}` : 'webcam-floating-card';
+            const floatingCard = document.getElementById(floatingCardId);
 
             // INTERAKSI HALAMAN AKTIVASI SENSOR WEBCAM
             if (gameState.webcamActivationActive) {
@@ -2427,56 +2619,77 @@
 
             // Interaksi Level 1-3 (Drag & Drop Kartu)
             if (gameState.currentLevel <= 3) {
-                const cardEl = targetEl ? (targetEl.closest('.card-item') || targetEl.closest('.card-item-p1') || targetEl.closest('.card-item-p2')) : null;
-                const slotEl = targetEl ? (targetEl.closest('.drop-slot') || targetEl.closest('.drop-slot-p1') || targetEl.closest('.drop-slot-p2')) : null;
+                const cardSelector = gameState.mode === 'battle' ? `.card-item-p${playerHand}` : '.card-item';
+                const slotSelector = gameState.mode === 'battle' ? `.drop-slot-p${playerHand}` : '.drop-slot';
 
-                // Reset indikator animasi pada seluruh slot
-                document.querySelectorAll('.drop-slot, .drop-slot-p1, .drop-slot-p2').forEach(s => s.classList.remove('slot-hover-active'));
+                const cardEl = targetEl ? targetEl.closest(cardSelector) : null;
+                const slotEl = targetEl ? targetEl.closest(slotSelector) : null;
+
+                const activeDraggedCard = gameState.mode === 'battle' 
+                    ? (playerHand === 1 ? gameState.draggedCardP1 : gameState.draggedCardP2)
+                    : gameState.draggedCard;
+
+                // Reset indikator animasi pada slot pemain terkait
+                document.querySelectorAll(slotSelector).forEach(s => s.classList.remove('slot-hover-active'));
 
                 if (isPinched) {
-                    if (cardEl && !gameState.draggedCard) {
+                    if (cardEl && !activeDraggedCard) {
                         const cardId = cardEl.dataset.cardId;
                         const cardObj = LEVEL_DATA[gameState.currentLevel].cards.find(c => c.id === cardId);
                         if (cardObj) {
-                            gameState.draggedCard = cardObj;
+                            if (gameState.mode === 'battle') {
+                                if (playerHand === 1) gameState.draggedCardP1 = cardObj;
+                                else gameState.draggedCardP2 = cardObj;
+                            } else {
+                                gameState.draggedCard = cardObj;
+                            }
                             playSound('pop');
                         }
                     }
 
                     // Tampilkan & geser kartu mengikuti pergerakan kursor tangan di Mode WebCam
-                    if (gameState.draggedCard) {
-                        if (floatingCard) {
-                            floatingCard.innerHTML = `
-                                <div class="w-20 h-24 sm:w-24 sm:h-28 bg-gradient-to-b from-emerald-600 via-teal-700 to-slate-900 border-2 border-amber-400 rounded-2xl flex flex-col items-center justify-center p-2 text-center shadow-2xl shadow-amber-500/60 scale-110 -rotate-3 animate-pulse">
-                                    <span class="text-3xl sm:text-4xl mb-1 filter drop-shadow-md">${gameState.draggedCard.emoji}</span>
-                                    <span class="font-fredoka text-xs font-bold text-white leading-tight">${gameState.draggedCard.name}</span>
-                                    <span class="text-[9px] font-bold text-amber-300 uppercase tracking-wider mt-1 bg-amber-950/90 px-2 py-0.5 rounded-full border border-amber-400/60 flex items-center gap-1 shadow">
-                                        <i class="fa-solid fa-hand-back-fist text-[8px]"></i> TERAMBIL
-                                    </span>
-                                </div>
-                            `;
-                            floatingCard.style.left = `${x}px`;
-                            floatingCard.style.top = `${y}px`;
-                            floatingCard.classList.remove('hidden');
-                        }
+                    const cardToRender = gameState.mode === 'battle' 
+                        ? (playerHand === 1 ? gameState.draggedCardP1 : gameState.draggedCardP2)
+                        : gameState.draggedCard;
 
-                        // Tambahkan animasi denyut bersinar jika kartu berada di atas slot
+                    if (cardToRender && floatingCard) {
+                        const colorBg = playerHand === 2 ? 'from-cyan-600 via-teal-700' : 'from-emerald-600 via-teal-700';
+                        const colorBorder = playerHand === 2 ? 'border-cyan-400' : 'border-amber-400';
+                        floatingCard.innerHTML = `
+                            <div class="w-16 h-20 sm:w-20 sm:h-24 bg-gradient-to-b ${colorBg} to-slate-900 border-2 ${colorBorder} rounded-2xl flex flex-col items-center justify-center p-1 text-center shadow-2xl scale-110 -rotate-3 animate-pulse">
+                                <span class="text-2xl sm:text-3xl mb-0.5 filter drop-shadow-md">${cardToRender.emoji}</span>
+                                <span class="font-fredoka text-[10px] sm:text-xs font-bold text-white leading-tight">${cardToRender.name}</span>
+                                <span class="text-[8px] font-bold text-amber-300 uppercase tracking-wider mt-0.5 bg-slate-950/90 px-1.5 py-0.5 rounded-full border border-amber-400/60">
+                                    P${playerHand} TERAMBIL
+                                </span>
+                            </div>
+                        `;
+                        floatingCard.style.left = `${x}px`;
+                        floatingCard.style.top = `${y}px`;
+                        floatingCard.classList.remove('hidden');
+
                         if (slotEl) {
                             slotEl.classList.add('slot-hover-active');
                         }
                     }
                 } else {
-                    if (gameState.draggedCard) {
+                    if (activeDraggedCard) {
                         if (slotEl) {
                             const slotIdx = parseInt(slotEl.dataset.slotIdx);
                             if (gameState.mode === 'battle') {
-                                const isP1Slot = slotEl.classList.contains('drop-slot-p1');
-                                placeCardInSlotBattle(gameState.draggedCard, slotIdx, isP1Slot ? 1 : 2);
+                                placeCardInSlotBattle(activeDraggedCard, slotIdx, playerHand);
                             } else {
-                                placeCardInSlot(gameState.draggedCard, slotIdx);
+                                placeCardInSlot(activeDraggedCard, slotIdx);
                             }
                         }
-                        gameState.draggedCard = null;
+
+                        if (gameState.mode === 'battle') {
+                            if (playerHand === 1) gameState.draggedCardP1 = null;
+                            else gameState.draggedCardP2 = null;
+                        } else {
+                            gameState.draggedCard = null;
+                        }
+
                         if (floatingCard) floatingCard.classList.add('hidden');
                     }
                 }
@@ -2484,19 +2697,23 @@
             // Interaksi Level 4 (Tarik Garis Jaring Makanan)
             else if (gameState.currentLevel === 4) {
                 if (floatingCard) floatingCard.classList.add('hidden');
-                const nodeEl = targetEl ? targetEl.closest('.organism-node') : null;
-                if (isPinched && nodeEl && !gameState.activeDragNode) {
+                const nodeSelector = gameState.mode === 'battle' ? `#nodes-p${playerHand} .organism-node` : '.organism-node';
+                const nodeEl = targetEl ? targetEl.closest(nodeSelector) : null;
+                
+                const activeDrag = gameState.mode === 'battle'
+                    ? (playerHand === 1 ? gameState.activeDragNodeP1 : gameState.activeDragNodeP2)
+                    : gameState.activeDragNode;
+
+                if (isPinched && nodeEl && !activeDrag) {
                     const nodeId = nodeEl.dataset.nodeId || nodeEl.id.replace('node-solo-', '').replace('node-p1-', '').replace('node-p2-', '');
                     if (gameState.mode === 'battle') {
-                        const isP1Node = nodeEl.id.includes('p1');
-                        startDragLineBattle(nodeId, isP1Node ? 1 : 2, { clientX: x, clientY: y });
+                        startDragLineBattle(nodeId, playerHand, { clientX: x, clientY: y });
                     } else {
                         startDragLine(nodeId, { clientX: x, clientY: y });
                     }
-                } else if (gameState.activeDragNode) {
+                } else if (activeDrag) {
                     if (gameState.mode === 'battle') {
-                        const activeLine = document.getElementById(`svg-p${gameState.activeDragPlayer}-active-line`);
-                        if (activeLine) activeLine.classList.remove('hidden');
+                        updateActiveDragLineBattle(playerHand, { clientX: x, clientY: y });
                     } else {
                         updateActiveDragLine({ clientX: x, clientY: y });
                     }
@@ -2504,7 +2721,7 @@
                     if (!isPinched && nodeEl) {
                         const targetId = nodeEl.dataset.nodeId || nodeEl.id.replace('node-solo-', '').replace('node-p1-', '').replace('node-p2-', '');
                         if (gameState.mode === 'battle') {
-                            endDragLineBattle(targetId, gameState.activeDragPlayer, { clientX: x, clientY: y });
+                            endDragLineBattle(targetId, playerHand, { clientX: x, clientY: y });
                         } else {
                             endDragLine(targetId, { clientX: x, clientY: y });
                         }
