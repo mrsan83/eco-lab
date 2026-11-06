@@ -549,7 +549,7 @@
 
     <!-- ==================== MODAL BUKU PANDUAN & PETUNJUK ==================== -->
     <div id="guide-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-        <div class="glass-panel max-w-2xl w-full rounded-2xl p-6 border-emerald-500/40 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col justify-between">
+        <div class="glass-panel max-w-4xl w-full rounded-2xl p-5 sm:p-6 border-emerald-500/40 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between pb-3 border-b border-slate-700 mb-4">
                     <h3 class="font-fredoka text-2xl text-emerald-400 font-bold flex items-center gap-2">
@@ -560,64 +560,116 @@
                     </button>
                 </div>
 
-                <div class="space-y-4 text-sm text-slate-300">
-                    <!-- Tujuan & Target Pembelajaran -->
-                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700">
-                        <h4 class="font-bold text-teal-300 text-base mb-2 flex items-center gap-2">
-                            <i class="fa-solid fa-bullseye"></i> Tujuan & Target Pembelajaran
-                        </h4>
-                        <ul class="space-y-1.5 text-xs sm:text-sm">
-                            <li><strong class="text-emerald-400">Tujuan Pembelajaran:</strong> Mengidentifikasi Komponen Ekosistem</li>
-                            <li><strong class="text-emerald-400">Target Capaian:</strong> Murid mampu mengidentifikasi peran masing-masing komponen ekosistem.</li>
-                        </ul>
+                <!-- Grid 2 Halaman: Kiri & Kanan (Telah Ditukar) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300">
+                    
+                    <!-- ==================== MATERI EKOSISTEM ==================== -->
+                    <div class="space-y-3.5 flex flex-col">
+                        <div class="bg-slate-900/90 p-2.5 rounded-xl border border-emerald-500/40 font-semibold text-xs text-emerald-300 flex items-center justify-between">
+                            <span class="flex items-center gap-2 font-fredoka"><i class="fa-solid fa-book-open"></i> MATERI EKOSISTEM</span>
+                        </div>
+
+                        <!-- 1. Tujuan & Target Pembelajaran -->
+                        <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700 space-y-1.5">
+                            <h4 class="font-bold text-teal-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-bullseye"></i> Tujuan & Target Pembelajaran
+                            </h4>
+                            <ul class="space-y-1 text-xs">
+                                <li><strong class="text-emerald-400">Tujuan Pembelajaran:</strong> Mengidentifikasi Komponen Ekosistem</li>
+                                <li><strong class="text-emerald-400">Target Capaian:</strong> Murid mampu mengidentifikasi peran masing-masing komponen ekosistem.</li>
+                            </ul>
+                        </div>
+
+                        <!-- 2. Komponen Ekosistem -->
+                        <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700 space-y-2">
+                            <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-sitemap"></i> Komponen Ekosistem IPA Kelas 7
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                                <div class="p-1.5 bg-emerald-950/40 rounded border border-emerald-800">
+                                    <strong class="text-emerald-300">🌾 Produsen:</strong> Organisme autotrof penyedia energi utama (Padi, Rumput, Fitoplankton).
+                                </div>
+                                <div class="p-1.5 bg-amber-950/40 rounded border border-amber-800">
+                                    <strong class="text-amber-300">🦗 Konsumen I:</strong> Herbivora pemakan produsen langsung (Belalang, Tikus, Zooplankton).
+                                </div>
+                                <div class="p-1.5 bg-cyan-950/40 rounded border border-cyan-800">
+                                    <strong class="text-cyan-300">🐸 Konsumen II/III:</strong> Karnivora/Omnivora sekunder (Katak, Ular, Burung Pipit).
+                                </div>
+                                <div class="p-1.5 bg-red-950/40 rounded border border-red-800">
+                                    <strong class="text-red-300">🦅 Apex Predator:</strong> Pemuncak rantai makanan tanpa pemangsa alami (Elang, Hiu).
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Rantai Makanan vs Jaring-Jaring Makanan -->
+                        <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700 text-xs space-y-1">
+                            <h4 class="font-bold text-cyan-300 text-xs flex items-center gap-1.5">
+                                <i class="fa-solid fa-lightbulb"></i> Rantai Makanan vs Jaring-Jaring Makanan
+                            </h4>
+                            <p class="text-[11px] leading-relaxed"><strong>Rantai Makanan:</strong> Jalur tunggal perpindahan energi dari produsen ke konsumen.<br>
+                            <strong>Jaring-Jaring Makanan:</strong> Kumpulan dari beberapa rantai makanan yang saling berhubungan. Semakin kompleks jaring-jaring makanan, semakin stabil ekosistem tersebut!</p>
+                        </div>
                     </div>
 
-                    <!-- Kontrol Gestur & Mouse -->
-                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700">
-                        <h4 class="font-bold text-amber-300 text-base mb-2 flex items-center gap-2">
-                            <i class="fa-solid fa-hand"></i> Cara Bermain & Mode
-                        </h4>
-                        <ul class="space-y-1.5 text-xs sm:text-sm">
-                            <li><strong class="text-emerald-400">Mode Solo:</strong> Selesaikan tantangan secara mandiri untuk mengumpulkan skor tertinggi.</li>
-                            <li><strong class="text-amber-400">Mode Battle (2 Players):</strong> Tanding 2 pemain secara berdampingan (Kiri vs Kanan). ⚡ <em>Pemain yang selesai lebih dahulu mendapat tambahan poin kecepatan & langsung melanjutkan ke level berikutnya!</em></li>
-                            <li><strong class="text-emerald-400">Mode Webcam:</strong> Dekatkan jempol & telunjuk (<span class="text-amber-300 font-semibold">PINCH</span>) untuk mengambil kartu / menarik garis energi. Buka telapak tangan untuk melepas.</li>
-                            <li><strong class="text-emerald-400">Mode Mouse / Sentuh:</strong> Klik & seret (drag & drop) kartu atau tarik garis dari satu node ke node lain secara langsung.</li>
-                        </ul>
-                    </div>
+                    <!-- ==================== PETUNJUK & KONTROL ==================== -->
+                    <div class="space-y-3.5 flex flex-col">
+                        <div class="bg-slate-900/90 p-2.5 rounded-xl border border-amber-500/40 font-semibold text-xs text-amber-300 flex items-center justify-between">
+                            <span class="flex items-center gap-2 font-fredoka"><i class="fa-solid fa-book-open"></i> PETUNJUK & KONTROL</span>
+                        </div>
 
-                    <!-- Peran Komponen Ekosistem -->
-                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700">
-                        <h4 class="font-bold text-emerald-400 text-base mb-2 flex items-center gap-2">
-                            <i class="fa-solid fa-sitemap"></i> Komponen Ekosistem IPA Kelas 7
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                            <div class="p-2 bg-emerald-950/40 rounded border border-emerald-800">
-                                <strong class="text-emerald-300">🌾 Produsen:</strong> Organisme autotrof penyedia energi utama (Padi, Rumput, Fitoplankton).
-                            </div>
-                            <div class="p-2 bg-amber-950/40 rounded border border-amber-800">
-                                <strong class="text-amber-300">🦗 Konsumen I (Herbivora):</strong> Pemakan produsen langsung (Belalang, Tikus, Zooplankton).
-                            </div>
-                            <div class="p-2 bg-cyan-950/40 rounded border border-cyan-800">
-                                <strong class="text-cyan-300">🐸 Konsumen II/III:</strong> Karnivora/Omnivora sekunder (Katak, Ular, Burung Pipit).
-                            </div>
-                            <div class="p-2 bg-red-950/40 rounded border border-red-800">
-                                <strong class="text-red-300">🦅 Apex Predator:</strong> Pemuncak rantai makanan tanpa pemangsa alami (Elang, Hiu).
+                        <!-- 1. Cara Bermain & Mode -->
+                        <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700 space-y-2">
+                            <h4 class="font-bold text-amber-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-hand"></i> Cara Bermain & Mode
+                            </h4>
+                            <ul class="space-y-1.5 text-xs">
+                                <li><strong class="text-emerald-400">Mode Solo:</strong> Selesaikan tantangan rantai & jaring-jaring secara mandiri untuk mengumpulkan skor tertinggi.</li>
+                                <li><strong class="text-amber-400">Mode Battle (2 Players):</strong> Tanding 2 pemain secara berdampingan (Kiri vs Kanan). ⚡ <em>Pemain yang selesai lebih dahulu mendapat tambahan poin kecepatan & langsung melanjutkan ke level berikutnya!</em></li>
+                                <li><strong class="text-emerald-400">Mode WebCam:</strong> Dekatkan jempol & telunjuk (<span class="text-amber-300 font-semibold">PINCH</span>) untuk mengambil kartu / menarik garis energi. Buka telapak tangan untuk melepas.</li>
+                                <li><strong class="text-emerald-400">Mode Sentuh / Mouse:</strong> Klik & seret (drag & drop) kartu atau tarik garis dari satu node ke node lain secara langsung.</li>
+                            </ul>
+                        </div>
+
+                        <!-- 2. Pengaturan Permainan (Interaktif Bisa Diklik) -->
+                        <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700 space-y-3">
+                            <h4 class="font-bold text-amber-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-sliders"></i> Pengaturan Permainan
+                            </h4>
+                            <p class="text-[11px] text-slate-300 font-medium">Klik pilihan mode dan kontrol di bawah ini untuk mengatur opsi permainan langsung:</p>
+                            
+                            <div class="space-y-2.5">
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mode Permainan:</span>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button type="button" id="guide-opt-solo" onclick="selectSetupOption('mode', 'solo')" class="p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/80 text-white font-fredoka font-semibold text-xs flex items-center justify-center gap-2 transition">
+                                            <i class="fa-solid fa-user text-emerald-400"></i> Solo (1 Pemain)
+                                        </button>
+                                        <button type="button" id="guide-opt-battle" onclick="selectSetupOption('mode', 'battle')" class="p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-semibold text-xs flex items-center justify-center gap-2 hover:border-amber-500 transition">
+                                            <span>⚔️</span> Battle (2 Pemain)
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kontrol Permainan:</span>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button type="button" id="guide-opt-webcam" onclick="selectSetupOption('control', 'webcam')" class="p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-semibold text-xs flex items-center justify-center gap-2 hover:border-emerald-500 transition">
+                                            <i class="fa-solid fa-camera text-teal-400"></i> Mode WebCam
+                                        </button>
+                                        <button type="button" id="guide-opt-touch" onclick="selectSetupOption('control', 'touch')" class="p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/80 text-white font-fredoka font-semibold text-xs flex items-center justify-center gap-2 transition">
+                                            <i class="fa-solid fa-hand-pointer text-amber-400"></i> Mode Sentuh
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Perbedaan Rantai vs Jaring -->
-                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 text-xs">
-                        <h4 class="font-bold text-cyan-300 text-sm mb-1">💡 Rantai Makanan vs Jaring-Jaring Makanan</h4>
-                        <p><strong>Rantai Makanan:</strong> Jalur tunggal perpindahan energi dari produsen ke konsumen.<br>
-                        <strong>Jaring-Jaring Makanan:</strong> Kumpulan dari beberapa rantai makanan yang saling berhubungan. Semakin kompleks jaring-jaring makanan, semakin stabil ekosistem tersebut!</p>
-                    </div>
                 </div>
             </div>
 
-            <div class="mt-6 pt-3 border-t border-slate-800 flex justify-end">
-                <button onclick="toggleGuideModal(false)" class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-fredoka font-bold rounded-xl text-sm transition">
-                    Paham, Lanjutkan!
+            <div class="mt-5 pt-3 border-t border-slate-800 flex justify-end">
+                <button onclick="startFromGuideModal()" class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-fredoka font-bold rounded-xl text-sm shadow-lg transition active:scale-95 flex items-center gap-2">
+                    <i class="fa-solid fa-play"></i> Lanjut Main
                 </button>
             </div>
         </div>
@@ -1003,22 +1055,34 @@
             if (type === 'mode') {
                 const btnSolo = document.getElementById('opt-mode-solo');
                 const btnBattle = document.getElementById('opt-mode-battle');
+                const gBtnSolo = document.getElementById('guide-opt-solo');
+                const gBtnBattle = document.getElementById('guide-opt-battle');
                 if (value === 'solo') {
-                    btnSolo.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
-                    btnBattle.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-amber-500 transition';
+                    if (btnSolo) btnSolo.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    if (btnBattle) btnBattle.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-amber-500 transition';
+                    if (gBtnSolo) gBtnSolo.className = 'p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/80 text-white font-fredoka font-semibold text-xs flex items-center justify-center gap-2 transition';
+                    if (gBtnBattle) gBtnBattle.className = 'p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-semibold text-xs flex items-center justify-center gap-2 hover:border-amber-500 transition';
                 } else {
-                    btnSolo.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-emerald-500 transition';
-                    btnBattle.className = 'p-3 rounded-xl border-2 border-amber-500 bg-amber-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    if (btnSolo) btnSolo.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-emerald-500 transition';
+                    if (btnBattle) btnBattle.className = 'p-3 rounded-xl border-2 border-amber-500 bg-amber-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    if (gBtnSolo) gBtnSolo.className = 'p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-semibold text-xs flex items-center justify-center gap-2 hover:border-emerald-500 transition';
+                    if (gBtnBattle) gBtnBattle.className = 'p-2.5 rounded-xl border-2 border-amber-500 bg-amber-950/80 text-white font-fredoka font-semibold text-xs flex items-center justify-center gap-2 transition';
                 }
             } else if (type === 'control') {
                 const btnWebcam = document.getElementById('opt-control-webcam');
                 const btnTouch = document.getElementById('opt-control-touch');
+                const gBtnWebcam = document.getElementById('guide-opt-webcam');
+                const gBtnTouch = document.getElementById('guide-opt-touch');
                 if (value === 'webcam') {
-                    btnWebcam.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
-                    btnTouch.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-amber-500 transition';
+                    if (btnWebcam) btnWebcam.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    if (btnTouch) btnTouch.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-amber-500 transition';
+                    if (gBtnWebcam) gBtnWebcam.className = 'p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/80 text-white font-fredoka font-semibold text-xs flex items-center justify-center gap-2 transition';
+                    if (gBtnTouch) gBtnTouch.className = 'p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-semibold text-xs flex items-center justify-center gap-2 hover:border-amber-500 transition';
                 } else {
-                    btnWebcam.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-emerald-500 transition';
-                    btnTouch.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    if (btnWebcam) btnWebcam.className = 'p-3 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-bold text-sm flex flex-col items-center gap-1 hover:border-emerald-500 transition';
+                    if (btnTouch) btnTouch.className = 'p-3 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-white font-fredoka font-bold text-sm flex flex-col items-center gap-1 transition';
+                    if (gBtnWebcam) gBtnWebcam.className = 'p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-slate-400 font-fredoka font-semibold text-xs flex items-center justify-center gap-2 hover:border-emerald-500 transition';
+                    if (gBtnTouch) gBtnTouch.className = 'p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/80 text-white font-fredoka font-semibold text-xs flex items-center justify-center gap-2 transition';
                 }
             }
         }
@@ -1830,6 +1894,11 @@
             const modal = document.getElementById('guide-modal');
             if (show) modal.classList.remove('hidden');
             else modal.classList.add('hidden');
+        }
+
+        function startFromGuideModal() {
+            toggleGuideModal(false);
+            confirmAndStartGame();
         }
 
 
